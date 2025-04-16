@@ -6,7 +6,6 @@ from django.core.validators import FileExtensionValidator
 from django.conf import settings
 
 class User(AbstractUser):
-    """Custom User model with additional fields"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, unique=True, blank=True)
@@ -14,7 +13,6 @@ class User(AbstractUser):
     date_of_membership = models.DateTimeField(default=timezone.now, blank=True, null=True)
     photo = models.ImageField(upload_to='user_photos/', blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])])
 
-    # Use email as username field
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
@@ -23,7 +21,6 @@ class User(AbstractUser):
 
 
 class Customer(models.Model):
-    """Customer model for storing customer information"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name='customers')
     name = models.CharField(max_length=100)
@@ -55,7 +52,6 @@ class Customer(models.Model):
 
 
 class CustomerOffer(models.Model):
-    """Model for storing customer offers/inquiries"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ROOM_TYPE_CHOICES = [
         ('1+0', '1+0'),
@@ -105,7 +101,6 @@ class CustomerOffer(models.Model):
 
 
 class OfferImage(models.Model):
-    """Model for storing multiple images for a customer offer"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     offer = models.ForeignKey(CustomerOffer, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(

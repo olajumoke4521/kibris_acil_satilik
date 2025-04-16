@@ -1,4 +1,4 @@
-# properties/models.py
+
 import uuid
 from django.db import models
 from django.core.validators import FileExtensionValidator
@@ -22,7 +22,6 @@ class Location(models.Model):
         return ' / '.join(part for part in parts if part)
 
 class PropertyAdvertisement(models.Model):
-    """Property Advertisement model"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     advertise_no = models.CharField(max_length=20, blank=True, null=True)
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='property_advertisements')
@@ -120,7 +119,6 @@ class PropertyImage(models.Model):
 
 
 class PropertyExplanation(models.Model):
-    """Property Explanation model"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     property_ad = models.OneToOneField(PropertyAdvertisement, on_delete=models.CASCADE, related_name='explanation')
     explanation = models.TextField()
@@ -130,7 +128,6 @@ class PropertyExplanation(models.Model):
 
 
 class PropertyExternalFeature(models.Model):
-    """Property External Features model"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     property_ad = models.OneToOneField(PropertyAdvertisement, on_delete=models.CASCADE, related_name='external_features')
     elevator = models.BooleanField(default=False)
@@ -157,7 +154,6 @@ class PropertyExternalFeature(models.Model):
 
 
 class PropertyInteriorFeature(models.Model):
-    """Property Interior Features model"""
     id = models.AutoField(primary_key=True)
     property_ad = models.OneToOneField(PropertyAdvertisement, on_delete=models.CASCADE,
                                        related_name='interior_features')
