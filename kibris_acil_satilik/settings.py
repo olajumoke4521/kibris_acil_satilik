@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -89,7 +90,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'kibris_acil_satilik',
         'USER': 'postgres',
-        'PASSWORD': 'Olajumoke',
+        'PASSWORD': '',
         'HOST': 'localhost',
         'PORT': '5432',
     }
@@ -112,8 +113,8 @@ REST_FRAMEWORK = {
 
 # Knox authentication settings
 REST_KNOX = {
-    'TOKEN_TTL': None,  # Tokens never expire
-    'AUTO_REFRESH': True,  # Tokens are refreshed on each request
+    'TOKEN_TTL': timedelta(days=7),
+    'AUTO_REFRESH': True,
     'USER_SERIALIZER': 'accounts.serializers.UserSerializer',
 }
 
