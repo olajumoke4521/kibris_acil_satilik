@@ -19,13 +19,13 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
     Handles CRUD, image uploads, and feature updates.
     """
     queryset = PropertyAdvertisement.objects.select_related(
-        'location', 'customer', 'user', 'explanation', 'external_features', 'interior_features'
+        'location', 'user', 'explanation', 'external_features', 'interior_features'
     ).prefetch_related('images').all()
     permission_classes = [permissions.IsAdminUser]
     authentication_classes = [TokenAuthentication]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['title', 'advertise_no', 'explanation__explanation', 'location__city', 'location__district', 'customer__name']
+    search_fields = ['title', 'advertise_no', 'explanation__explanation', 'location__city', 'location__district']
     ordering_fields = ['created_at', 'published_date', 'price', 'title']
     ordering = ['-created_at']
 
@@ -44,97 +44,68 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
         if not province: return None
 
         location_obj, _ = Location.objects.get_or_create(
-            city=province,
+            province=province,
             district=district if district else None,
             neighborhood=neighborhood if neighborhood else None
         )
         return location_obj
 
-    def update_or_create_nested(self, instance, model_class, related_name, data):
-        """Helper: Updates or creates OneToOne related objects."""
-        if data is not None:
-            obj, created = model_class.objects.update_or_create(
-                property_ad=instance,
-                defaults=data
-            )
-            return obj
-        else:
-            pass
-        return None
-
-    def perform_create(self, serializer):
-        """Creation of property and related objects."""
-        user = self.request.user
-        validated_data = serializer.validated_data.copy()
-
-        location_obj = self.get_or_create_location(validated_data)
-        explanation_data = validated_data.pop('explanation', None)
-        external_features_data = validated_data.pop('external_features', None)
-        interior_features_data = validated_data.pop('interior_features', None)
-
-        instance = serializer.save(user=user, location=location_obj)
-
-        if explanation_data:
-            PropertyExplanation.objects.create(property_ad=instance, explanation=explanation_data)
-        self.update_or_create_nested(instance, PropertyExternalFeature, 'external_features', external_features_data)
-        self.update_or_create_nested(instance, PropertyInteriorFeature, 'interior_features', interior_features_data)
-
-        return instance
-
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        # Extract location data to create location object
+        data = request.data.copy()
+        serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        instance = self.perform_create(serializer)
 
+        # Get or create location and pass it to the serializer
+        location_obj = self.get_or_create_location({
+            'province': data.get('province'),
+            'district': data.get('district'),
+            'neighborhood': data.get('neighborhood')
+        })
+
+        # Create the property with user and location
+        instance = serializer.save(user=self.request.user, location=location_obj)
+
+        # Handle image uploads
         images_data = request.FILES.getlist('images')
         if images_data:
             make_first_cover = not PropertyImage.objects.filter(property_ad=instance, is_cover=True).exists()
             for i, image_file in enumerate(images_data):
-                 PropertyImage.objects.create(
+                PropertyImage.objects.create(
                     property_ad=instance,
                     image=image_file,
                     is_cover=(i == 0 and make_first_cover)
-                 )
+                )
 
         detail_serializer = PropertyDetailSerializer(instance, context=self.get_serializer_context())
         headers = self.get_success_headers(detail_serializer.data)
         return Response(detail_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @transaction.atomic
-    def perform_update(self, serializer):
-        """Update of property and related objects."""
-        instance = serializer.instance
-        validated_data = serializer.validated_data.copy()
-
-        if 'province' in validated_data:
-            location_obj = self.get_or_create_location(validated_data)
-            instance.location = location_obj
-
-        explanation_data = validated_data.pop('explanation', None)
-        external_features_data = validated_data.pop('external_features', None)
-        interior_features_data = validated_data.pop('interior_features', None)
-
-        instance = serializer.save()
-        if explanation_data is not None:
-            PropertyExplanation.objects.update_or_create(
-                property_ad=instance,
-                defaults={'explanation': explanation_data}
-            )
-        self.update_or_create_nested(instance, PropertyExternalFeature, 'external_features', external_features_data)
-        self.update_or_create_nested(instance, PropertyInteriorFeature, 'interior_features', interior_features_data)
-
-        return instance
-
-    @transaction.atomic
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
+        data = request.data.copy()
 
-        detail_serializer = PropertyDetailSerializer(instance, context=self.get_serializer_context())
+        # Handle location update if province data is provided
+        if 'province' in data:
+            location_obj = self.get_or_create_location({
+                'province': data.get('province'),
+                'district': data.get('district'),
+                'neighborhood': data.get('neighborhood')
+            })
+            # Set the location for use in serializer.save()
+            location = location_obj
+        else:
+            location = instance.location
+
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        updated_instance = serializer.save(location=location)
+
+        # Return the updated instance with detail serializer
+        detail_serializer = PropertyDetailSerializer(updated_instance, context=self.get_serializer_context())
         return Response(detail_serializer.data)
 
     @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='upload-images')
@@ -210,13 +181,7 @@ class PublicPropertyListView(generics.ListAPIView):
 
     def get_queryset(self):
         """Return active, published property advertisements"""
-        return PropertyAdvertisement.objects.filter(
-            advertise_status='on'
-        ).select_related(
-            'location'
-        ).prefetch_related(
-            'images'
-        ).order_by('-published_date')
+        return PropertyAdvertisement.objects.filter(advertise_status='on').select_related('location').prefetch_related('images').order_by('-published_date')
 
 
 class PublicPropertyDetailView(generics.RetrieveAPIView):
@@ -227,10 +192,4 @@ class PublicPropertyDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         """Return active, published property advertisements"""
-        return PropertyAdvertisement.objects.filter(
-            advertise_status='on'
-        ).select_related(
-            'location', 'customer', 'user', 'explanation', 'external_features', 'interior_features'
-        ).prefetch_related(
-            'images'
-        )
+        return PropertyAdvertisement.objects.filter(advertise_status='on').select_related('location', 'customer', 'user', 'explanation', 'external_features', 'interior_features').prefetch_related('images')

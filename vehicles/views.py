@@ -36,48 +36,20 @@ class CarAdminViewSet(viewsets.ModelViewSet):
             return CarAdminCreateUpdateSerializer
         return CarDetailSerializer
 
-    def _update_or_create_nested(self, instance, model_class, related_name_prefix, data):
-         """Helper: Updates or creates OneToOne related objects for cars."""
-         if data is not None:
-             obj, created = model_class.objects.update_or_create(
-                 car_ad=instance,
-                 defaults=data
-             )
-             return obj
-         return None
-
-
-    @transaction.atomic
-    def perform_create(self, serializer):
-        """Creation of car ad and related objects."""
-        admin_user = self.request.user
-        validated_data = serializer.validated_data.copy()
-
-        explanation_data = validated_data.pop('explanation', None)
-        external_features_data = validated_data.pop('external_features', None)
-        internal_features_data = validated_data.pop('internal_features', None)
-
-        instance = serializer.save(user=admin_user)
-
-        if explanation_data:
-            CarExplanation.objects.create(car_ad=instance, explanation=explanation_data)
-        self._update_or_create_nested(instance, CarExternalFeature, 'external_features', external_features_data)
-        self._update_or_create_nested(instance, CarInternalFeature, 'internal_features', internal_features_data)
-
-        return instance
-
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        instance = self.perform_create(serializer)
+
+        instance = serializer.save(user=self.request.user)
 
         images_data = request.FILES.getlist('images')
         if images_data:
             make_first_cover = not CarImage.objects.filter(car_ad=instance, is_cover=True).exists()
             for i, image_file in enumerate(images_data):
                 CarImage.objects.create(
-                    car_ad=instance, image=image_file,
+                    car_ad=instance,
+                    image=image_file,
                     is_cover=(i == 0 and make_first_cover)
                 )
 
@@ -85,34 +57,17 @@ class CarAdminViewSet(viewsets.ModelViewSet):
         headers = self.get_success_headers(detail_serializer.data)
         return Response(detail_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-
-    @transaction.atomic
-    def perform_update(self, serializer):
-        """Update of car ad and related objects."""
-        instance = serializer.instance
-        validated_data = serializer.validated_data.copy()
-
-        explanation_data = validated_data.pop('explanation', None)
-        external_features_data = validated_data.pop('external_features', None)
-        internal_features_data = validated_data.pop('internal_features', None)
-
-        instance = serializer.save()
-
-        if explanation_data is not None:
-            CarExplanation.objects.update_or_create(car_ad=instance, defaults={'explanation': explanation_data})
-        self._update_or_create_nested(instance, CarExternalFeature, 'external_features', external_features_data)
-        self._update_or_create_nested(instance, CarInternalFeature, 'internal_features', internal_features_data)
-
-        return instance
-
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        detail_serializer = CarDetailSerializer(instance, context=self.get_serializer_context())
+
+        updated_instance = serializer.save()
+
+        detail_serializer = CarDetailSerializer(updated_instance, context=self.get_serializer_context())
         return Response(detail_serializer.data)
 
     @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='upload-images')
@@ -165,11 +120,7 @@ class PublicCarListView(generics.ListAPIView):
     ordering = ['-published_date']
 
     def get_queryset(self):
-        return CarAdvertisement.objects.filter(
-            advertise_status='on'
-        ).prefetch_related(
-            'images'
-        ).order_by('-published_date')
+        return CarAdvertisement.objects.filter(advertise_status='on').prefetch_related('images').order_by('-published_date')
 
 
 class PublicCarDetailView(generics.RetrieveAPIView):
@@ -178,10 +129,4 @@ class PublicCarDetailView(generics.RetrieveAPIView):
     lookup_field = 'pk'
 
     def get_queryset(self):
-        return CarAdvertisement.objects.filter(
-            advertise_status='on'
-        ).select_related(
-            'customer', 'user', 'explanation', 'external_features', 'internal_features'
-        ).prefetch_related(
-            'images'
-        )
+        return CarAdvertisement.objects.filter(advertise_status='on').select_related('customer', 'user', 'explanation', 'external_features', 'internal_features').prefetch_related('images')

@@ -21,6 +21,8 @@ class CarAdvertisement(models.Model):
     ]
     price_type = models.CharField(max_length=3, choices=PRICE_TYPE_CHOICES, default='TRY')
     province = models.CharField(max_length=100, blank=True, null=True)
+    neighborhood = models.CharField(max_length=100, blank=True, null=True)
+    district = models.CharField(max_length=100, blank=True, null=True)
     address = models.TextField()
 
     ADVERT_STATUS_CHOICES = [

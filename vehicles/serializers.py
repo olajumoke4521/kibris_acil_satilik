@@ -22,7 +22,6 @@ class CarImageSerializer(serializers.ModelSerializer):
         return None
 
 
-
 class CarExplanationSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -92,7 +91,6 @@ class CarDetailSerializer(serializers.ModelSerializer):
     explanation = serializers.CharField(source='explanation.explanation', read_only=True, allow_null=True)
     external_features = CarExternalFeatureSerializer(read_only=True, allow_null=True)
     internal_features = CarInternalFeatureSerializer(read_only=True, allow_null=True)
-    customer = CustomerSerializer(read_only=True)
 
     class Meta:
         model = CarAdvertisement
@@ -102,7 +100,6 @@ class CarDetailSerializer(serializers.ModelSerializer):
 class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
     """Serializer used by Admin for Creating and Updating Cars"""
 
-    customer_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
     explanation = serializers.CharField(write_only=True, required=False, allow_blank=True)
     external_features = CarExternalFeatureSerializer(required=False, allow_null=True)
     internal_features = CarInternalFeatureSerializer(required=False, allow_null=True)
@@ -110,10 +107,57 @@ class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CarAdvertisement
         fields = [
-            'title', 'price', 'price_type', 'province', 'address',
+            'title', 'price', 'price_type', 'province', 'district', 'neighborhood', 'address',
             'brand', 'model', 'model_year', 'color', 'gear_type',
             'fuel_type', 'steering_type', 'engine_displacement', 'engine_power',
-             'advertise_status',
-            'customer_id',
-            'explanation', 'external_features', 'internal_features',
+             'advertise_status', 'explanation', 'external_features', 'internal_features',
         ]
+
+    def create(self, validated_data):
+
+        external_features_data = validated_data.pop('external_features', None)
+        internal_features_data = validated_data.pop('internal_features', None)
+        explanation_data = validated_data.pop('explanation', None)
+
+        car_instance = CarAdvertisement.objects.create(**validated_data)
+
+        if external_features_data:
+            CarExternalFeature.objects.create(car_ad=car_instance, **external_features_data)
+
+        if internal_features_data:
+            CarInternalFeature.objects.create(car_ad=car_instance, **internal_features_data)
+
+        if explanation_data:
+            CarExplanation.objects.create(car_ad=car_instance, explanation=explanation_data)
+
+        return car_instance
+
+    def update(self, instance, validated_data):
+
+        external_features_data = validated_data.pop('external_features', None)
+        internal_features_data = validated_data.pop('internal_features', None)
+        explanation_data = validated_data.pop('explanation', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if external_features_data is not None:
+            CarExternalFeature.objects.update_or_create(
+                car_ad=instance,
+                defaults=external_features_data
+            )
+
+        if internal_features_data is not None:
+            CarInternalFeature.objects.update_or_create(
+                car_ad=instance,
+                defaults=internal_features_data
+            )
+
+        if explanation_data is not None:
+            CarExplanation.objects.update_or_create(
+                car_ad=instance,
+                defaults={'explanation': explanation_data}
+            )
+
+        return instance
