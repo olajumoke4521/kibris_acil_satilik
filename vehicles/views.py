@@ -6,9 +6,10 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from knox.auth import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
+
+from .filters import CarFilter
 from .models import (
-    CarAdvertisement, CarImage, CarExplanation,
-    CarExternalFeature, CarInternalFeature
+    CarAdvertisement, CarImage
 )
 from accounts.models import Customer
 from .serializers import (
@@ -24,6 +25,7 @@ class CarAdminViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAdminUser]
     authentication_classes = [TokenAuthentication]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    filterset_class = CarFilter
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'advertise_no', 'brand', 'model', 'explanation__explanation', 'customer__name']
     ordering_fields = ['created_at', 'published_date', 'price', 'title', 'model_year', 'mileage']
@@ -115,6 +117,7 @@ class PublicCarListView(generics.ListAPIView):
     serializer_class = CarListSerializer
     permission_classes = [permissions.AllowAny]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = CarFilter
     search_fields = ['title', 'brand', 'model', 'explanation__explanation']
     ordering_fields = ['published_date', 'price', 'title', 'model_year']
     ordering = ['-published_date']

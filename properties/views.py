@@ -5,12 +5,12 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from knox.auth import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import PropertyAdvertisement, PropertyImage, PropertyExternalFeature, PropertyInteriorFeature, Location, \
-    PropertyExplanation
+from .models import PropertyAdvertisement, PropertyImage, Location
 from .serializers import (
     PropertyAdminListSerializer, PropertyDetailSerializer, PropertyAdminCreateUpdateSerializer,
     PropertyListSerializer, PropertyImageSerializer
 )
+from .filters import PropertyFilter
 
 
 class PropertyAdminViewSet(viewsets.ModelViewSet):
@@ -25,6 +25,7 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
     authentication_classes = [TokenAuthentication]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = PropertyFilter
     search_fields = ['title', 'advertise_no', 'explanation__explanation', 'location__city', 'location__district']
     ordering_fields = ['created_at', 'published_date', 'price', 'title']
     ordering = ['-created_at']
@@ -52,22 +53,18 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        # Extract location data to create location object
         data = request.data.copy()
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
 
-        # Get or create location and pass it to the serializer
         location_obj = self.get_or_create_location({
             'province': data.get('province'),
             'district': data.get('district'),
             'neighborhood': data.get('neighborhood')
         })
 
-        # Create the property with user and location
         instance = serializer.save(user=self.request.user, location=location_obj)
 
-        # Handle image uploads
         images_data = request.FILES.getlist('images')
         if images_data:
             make_first_cover = not PropertyImage.objects.filter(property_ad=instance, is_cover=True).exists()
@@ -88,14 +85,13 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         data = request.data.copy()
 
-        # Handle location update if province data is provided
         if 'province' in data:
             location_obj = self.get_or_create_location({
                 'province': data.get('province'),
                 'district': data.get('district'),
                 'neighborhood': data.get('neighborhood')
             })
-            # Set the location for use in serializer.save()
+
             location = location_obj
         else:
             location = instance.location
@@ -104,7 +100,6 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         updated_instance = serializer.save(location=location)
 
-        # Return the updated instance with detail serializer
         detail_serializer = PropertyDetailSerializer(updated_instance, context=self.get_serializer_context())
         return Response(detail_serializer.data)
 
@@ -175,7 +170,8 @@ class PublicPropertyListView(generics.ListAPIView):
     serializer_class = PropertyListSerializer
     permission_classes = [permissions.AllowAny]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['title', 'explanation', 'location__city', 'location__district']
+    filterset_class = PropertyFilter
+    search_fields = ['title', 'explanation__explanation', 'location__city', 'location__district']
     ordering_fields = ['published_date', 'price', 'title']
     ordering = ['-published_date']
 
