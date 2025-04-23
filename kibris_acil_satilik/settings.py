@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-($j8ki7xuz69c!pkp_mykfhglt25e47ef+ee-3lyazz#r@0eni
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['0.0.0.0']
 
 
 # Application definition
@@ -55,6 +55,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -96,6 +97,13 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
@@ -141,6 +149,10 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+JWT_CLIENT_SECRET_KEY = ''
+JWT_CLIENT_TTL_SECONDS = 48800
+JWT_CLIENT_ALGORITHM = 'HS256'
 
 
 # Internationalization

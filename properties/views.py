@@ -37,6 +37,10 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
             return PropertyAdminCreateUpdateSerializer
         return PropertyDetailSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset
+
     def get_or_create_location(self, validated_data):
         province = validated_data.pop('province', None)
         district = validated_data.pop('district', None)

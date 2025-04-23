@@ -38,6 +38,10 @@ class CarAdminViewSet(viewsets.ModelViewSet):
             return CarAdminCreateUpdateSerializer
         return CarDetailSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset
+
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

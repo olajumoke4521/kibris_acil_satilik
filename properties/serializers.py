@@ -47,22 +47,13 @@ class PropertyInteriorFeatureSerializer(serializers.ModelSerializer):
 
 class PropertyListSerializer(serializers.ModelSerializer):
     """Serializer for PUBLIC listing view"""
-    cover_image_url = serializers.SerializerMethodField()
+    images = PropertyImageSerializer(many=True, read_only=True)
     location_str = serializers.CharField(source='location.__str__', read_only=True)
 
     class Meta:
         model = PropertyAdvertisement
-        fields = ('id','advertise_no', 'title', 'price', 'price_type', 'address', 'location_str', 'property_type','room_type','gross_area', 'net_area', 'cover_image_url', 'published_date')
+        fields = ('id','advertise_no', 'title', 'price', 'price_type', 'address', 'location_str', 'property_type','room_type','gross_area', 'net_area', 'images', 'published_date')
 
-    def get_cover_image_url(self, obj):
-        cover = obj.images.filter(is_cover=True).first()
-        request = self.context.get('request')
-        if cover and cover.image:
-            return request.build_absolute_uri(cover.image.url) if request else cover.image.url
-        first_image = obj.images.first()
-        if first_image and first_image.image:
-            return request.build_absolute_uri(first_image.image.url) if request else first_image.image.url
-        return None
 
 class PropertyAdminListSerializer(PropertyListSerializer):
      """Serializer for ADMIN listing view"""
