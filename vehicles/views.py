@@ -1,3 +1,6 @@
+import json
+
+from django.core.exceptions import ValidationError
 from django.db import transaction, IntegrityError
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, permissions, status, generics, filters
@@ -6,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from knox.auth import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
-
+from rest_framework.views import APIView
 from .filters import CarFilter
 from .models import (
     CarAdvertisement, CarImage
@@ -116,6 +119,114 @@ class CarAdminViewSet(viewsets.ModelViewSet):
                  new_cover.save(update_fields=['is_cover'])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class CreateCustomerAndCarView(APIView):
+    """
+    Handles the creation of a Customer (or uses existing) and a related CarAdvertisement
+    (including Features, Explanation, Images) in a single, atomic request.
+    Uses get_or_create for the customer based on a unique key (e.g., email).
+    """
+    permission_classes = [permissions.IsAdminUser]
+    authentication_classes = [TokenAuthentication]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        data = request.data.copy()
+        customer_instance = None
+        car_instance = None
+
+        customer_data = {}
+        car_data = {}
+        customer_photo_file = None
+        car_image_files = request.FILES.getlist('images')
+
+        customer_field_keys = ['name', 'email', 'photo', 'mobile_number', 'mobile_number_2', 'mobile_number_3', 'telephone', 'telephone_2',
+                               'telephone_3', 'fax', 'type_of_advertise', 'customer_role']
+        customer_unique_key = 'email'
+        nested_car_keys = ['external_features', 'internal_features', 'explanation']
+
+        for key, value in request.data.items():
+            if key == 'photo' and value:
+                 if hasattr(value, 'content_type') and 'image' in value.content_type:
+                     customer_photo_file = value
+                 else:
+                      print(f"Warning: Ignoring non-image file provided for 'photo': {key}")
+                 continue
+
+            if key in customer_field_keys:
+                customer_data[key] = value
+            elif key not in ['images']:
+                if key in nested_car_keys and isinstance(value, str):
+                    try:
+                        if key in ['external_features', 'internal_features']:
+                             car_data[key] = json.loads(value)
+                        else:
+                             car_data[key] = value
+                    except json.JSONDecodeError:
+                        return Response({key: [f"Invalid JSON string provided for {key}."]}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    car_data[key] = value
+
+        lookup_value = customer_data.get(customer_unique_key)
+        if not lookup_value:
+            return Response({customer_unique_key: ["This field is required to find or create a customer."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        defaults_for_create = {k: v for k, v in customer_data.items() if k != customer_unique_key and k != 'photo'}
+
+        try:
+            customer_instance, created = Customer.objects.get_or_create(
+                **{customer_unique_key: lookup_value},
+                defaults=defaults_for_create
+            )
+
+            if created and hasattr(customer_instance, 'user') and not customer_instance.user:
+                 customer_instance.user = request.user
+
+            if customer_photo_file:
+                customer_instance.photo = customer_photo_file
+
+                customer_instance.save()
+            elif created and hasattr(customer_instance, 'user') and customer_instance.user == request.user:
+                 customer_instance.save(update_fields=['user'])
+
+        except IntegrityError as e:
+             return Response({"customer_error": f"Database constraint issue during customer get/create: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+        except ValidationError as e:
+             return Response({"customer_error": e.message_dict}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"customer_error": f"Failed to get or create customer: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        car_serializer = CarAdminCreateUpdateSerializer(data=car_data, context={'request': request})
+
+        if not car_serializer.is_valid():
+
+            return Response({"car_errors": car_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            car_instance = car_serializer.save(
+                user=request.user,
+                customer=customer_instance
+            )
+        except ValidationError as e:
+             return Response({"car_errors": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"car_errors": f"Failed to save car advertisement: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if car_image_files:
+            make_first_cover = not CarImage.objects.filter(car_ad=car_instance, is_cover=True).exists()
+            for i, image_file in enumerate(car_image_files):
+                try:
+                    CarImage.objects.create(
+                        car_ad=car_instance,
+                        image=image_file,
+                        is_cover=(i == 0 and make_first_cover)
+                    )
+                except Exception as e:
+                    print(f"Error saving car image {i}: {e}")
+                    return Response({"image_error": f"Failed to save car image {i+1}: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        detail_serializer = CarDetailSerializer(car_instance, context={'request': request})
+        return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
 
 class PublicCarListView(generics.ListAPIView):
     serializer_class = CarListSerializer

@@ -10,6 +10,7 @@ urlpatterns = [
     # Admin URLs
     path('', include(router.urls)),
 
+    path('admin/create-customer-and-car/', views.CreateCustomerAndCarView.as_view(), name='create_customer_and_car'),
     # Public URLs
     path('cars/', views.PublicCarListView.as_view(), name='public-car-list'),
     path('cars/<uuid:pk>/', views.PublicCarDetailView.as_view(), name='public-car-detail'),

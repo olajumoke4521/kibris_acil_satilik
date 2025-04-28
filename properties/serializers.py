@@ -92,7 +92,8 @@ class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyAdvertisement
-        exclude = ('id', 'user', 'advertise_no', 'created_at', 'updated_at', 'published_date', 'location')
+        exclude = ('id', 'created_at', 'updated_at', 'published_date', 'location')
+        read_only_fields = ('user', 'customer')
 
     def create(self, validated_data):
         external_features_data = validated_data.pop('external_features', None)

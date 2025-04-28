@@ -95,6 +95,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
         """Return customers for the current user only"""

@@ -6,12 +6,39 @@ from .models import Customer, CustomerOffer, User, OfferImage
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User objects"""
     photo = serializers.ImageField(max_length=None, use_url=True, required=False, allow_null=True)
+    password = serializers.CharField(write_only=True, required=False, style={'input_type': 'password'})
+    password_confirm = serializers.CharField(write_only=True, required=False, style={'input_type': 'password'})
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'phone', 'date_of_membership', 'photo', 'is_staff', 'is_superuser')
+        fields = ('id', 'email', 'phone', 'date_of_membership', 'photo', 'is_staff', 'is_superuser', 'password', 'password_confirm')
         read_only_fields = ('id', 'date_of_membership', 'is_staff', 'is_superuser')
 
+    def validate(self, attrs):
+        password = attrs.get('password')
+        password_confirm = attrs.get('password_confirm')
+        if password or password_confirm:
+            if not password:
+                raise serializers.ValidationError({"password": "This field is required when changing password."})
+            if not password_confirm:
+                raise serializers.ValidationError(
+                    {"password_confirm": "This field is required when changing password."})
+            if password != password_confirm:
+                raise serializers.ValidationError({"password": "Password fields didn't match."})
+        elif 'password' in attrs:
+            attrs.pop('password', None)
+            attrs.pop('password_confirm', None)
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        validated_data.pop('password_confirm', None)
+
+        if password:
+            instance.set_password(password)
+
+        return super().update(instance, validated_data)
 
 class RegisterSerializer(serializers.ModelSerializer):
     """Serializer for user registration"""
@@ -77,6 +104,7 @@ class LoginSerializer(serializers.Serializer):
 
 class CustomerSerializer(serializers.ModelSerializer):
     """Serializer for Customer objects"""
+    photo = serializers.ImageField(max_length=None, use_url=True, required=False, allow_null=True)
     user_id = serializers.UUIDField(source='user.id', read_only=True)
 
     user_email = serializers.EmailField(source='user.email', read_only=True)
@@ -84,7 +112,7 @@ class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
         fields = (
-            'id', 'user_id', 'user_email', 'name', 'email', 'mobile_number',
+            'id', 'user_id', 'user_email', 'name', 'email', 'photo', 'mobile_number',
             'mobile_number_2', 'mobile_number_3', 'telephone',
             'telephone_2', 'telephone_3', 'fax', 'type_of_advertise',
             'customer_role', 'created_at', 'updated_at'

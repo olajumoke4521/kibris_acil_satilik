@@ -13,22 +13,24 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+load_dotenv(dotenv_path=BASE_DIR / '.env')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-($j8ki7xuz69c!pkp_mykfhglt25e47ef+ee-3lyazz#r@0eni'
+SECRET_KEY = os.getenv('SECRET_KEY', 'fallback-secret')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['0.0.0.0']
-
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',')]
 
 # Application definition
 
@@ -90,20 +92,18 @@ WSGI_APPLICATION = 'kibris_acil_satilik.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'kibris_acil_satilik',
-        'USER': 'postgres',
-        'PASSWORD': '',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
     }
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
+CORS_ALLOW_CREDENTIALS = os.getenv('CORS_ALLOW_CREDENTIALS', 'True') == 'False'
 
-CORS_ALLOW_CREDENTIALS = True
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
@@ -150,9 +150,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-JWT_CLIENT_SECRET_KEY = ''
-JWT_CLIENT_TTL_SECONDS = 48800
-JWT_CLIENT_ALGORITHM = 'HS256'
+JWT_CLIENT_SECRET_KEY = os.getenv('JWT_CLIENT_SECRET_KEY')
+JWT_CLIENT_TTL_SECONDS = int(os.getenv('JWT_CLIENT_TTL_SECONDS', 3600))
+JWT_CLIENT_ALGORITHM = os.getenv('JWT_CLIENT_ALGORITHM', 'HS256')
 
 
 # Internationalization

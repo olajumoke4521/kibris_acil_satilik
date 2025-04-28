@@ -1,15 +1,22 @@
-from django.db import transaction
+import json
+import uuid
+
+from django.core.exceptions import ValidationError
+from django.db import transaction, IntegrityError
 from rest_framework import viewsets, permissions, status, generics, filters
 from rest_framework.decorators import action
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from knox.auth import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import PropertyAdvertisement, PropertyImage, Location
+from accounts.models import Customer
 from .serializers import (
     PropertyAdminListSerializer, PropertyDetailSerializer, PropertyAdminCreateUpdateSerializer,
     PropertyListSerializer, PropertyImageSerializer
 )
+from accounts.serializers import CustomerSerializer
 from .filters import PropertyFilter
 
 
@@ -168,6 +175,160 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class CreateCustomerAndPropertyView(APIView):
+    """
+    Handles the creation of a Customer and a related PropertyAdvertisement
+    (including Location, Features, Explanation, Images) in a single, atomic request.
+    """
+    permission_classes = [permissions.IsAdminUser] # Or other appropriate permission
+    authentication_classes = [TokenAuthentication]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_or_create_location(self, data):
+        province = data.get('province', None)
+        district = data.get('district', None)
+        neighborhood = data.get('neighborhood', None)
+
+        if not province: return None
+        district = district if district else None
+        neighborhood = neighborhood if neighborhood else None
+
+        location_obj, created = Location.objects.get_or_create(
+            province=province,
+            district=district,
+            neighborhood=neighborhood
+        )
+        return location_obj
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        """
+        Handles the POST request to create both Customer and PropertyAdvertisement.
+        """
+        data = request.data.copy()
+        customer_instance = None
+        property_instance = None
+
+        customer_data = {}
+        property_data = {}
+        customer_photo_file = None
+        property_image_files = request.FILES.getlist('images')
+
+        customer_field_keys = ['name', 'email', 'photo', 'mobile_number', 'mobile_number_2', 'mobile_number_3',
+                               'telephone', 'telephone_2',
+                               'telephone_3', 'fax', 'type_of_advertise', 'customer_role']
+        customer_unique_key = 'email'
+        nested_property_keys = ['external_features', 'interior_features']
+        location_field_keys = ['province', 'district', 'neighborhood']
+
+        for key, value in request.data.items():
+            if key == 'photo' and value:
+                if hasattr(value, 'content_type') and 'image' in value.content_type:
+                    customer_photo_file = value
+                else:
+                    print(f"Warning: Ignoring non-image file provided for 'photo': {key}")
+                continue
+
+            if key in customer_field_keys:
+                customer_data[key] = value
+            elif key not in ['images']:
+                if key in nested_property_keys and isinstance(value, str):
+                    try:
+                        property_data[key] = json.loads(value)
+                    except json.JSONDecodeError:
+                        return Response({key: [f"Invalid JSON string provided for {key}."]},
+                                        status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    property_data[key] = value
+
+        lookup_value = customer_data.get(customer_unique_key)
+        if not lookup_value:
+            return Response({customer_unique_key: ["This field is required to find or create a customer."]},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        defaults_for_create = {}
+        # Define which customer keys expect a single value
+        single_value_customer_keys = ['name', 'mobile_number', 'mobile_number_2', 'mobile_number_3', 'telephone',
+                                      'telephone_2',
+                                      'telephone_3', 'fax', 'type_of_advertise', 'customer_role']
+
+        for key, value in customer_data.items():
+            if key != customer_unique_key and key != 'photo':
+                if key in single_value_customer_keys and isinstance(value, list):
+                    if value:
+                        print(f"Warning: Received list for customer key '{key}'. Using first element: '{value[0]}'")
+                        value = value[0]
+                    else:
+                        print(f"Warning: Received empty list for customer key '{key}'. Skipping.")
+                        continue
+                defaults_for_create[key] = value
+
+        try:
+            customer_instance, created = Customer.objects.get_or_create(
+                **{customer_unique_key: lookup_value},
+                defaults=defaults_for_create
+            )
+
+            save_customer_needed = False
+            if created and hasattr(customer_instance, 'user') and not customer_instance.user:
+                customer_instance.user = request.user
+                save_customer_needed = True
+
+            if customer_photo_file:
+                customer_instance.photo = customer_photo_file
+                save_customer_needed = True
+
+            if save_customer_needed:
+                customer_instance.save()
+
+        except IntegrityError as e:
+            return Response({"customer_error": f"Database constraint issue during customer get/create: {str(e)}"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        except ValidationError as e:
+            return Response({"customer_error": e.message_dict}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"customer_error": f"Failed to get or create customer: {str(e)}"},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+
+        location_instance = self.get_or_create_location(property_data)
+        if location_instance is None and request.data.get('province'):
+            return Response({"location_error": "Failed to get or create location based on provided province."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        property_serializer = PropertyAdminCreateUpdateSerializer(data=property_data, context={'request': request})
+
+        if not property_serializer.is_valid():
+            return Response({"property_errors": property_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            property_instance = property_serializer.save(
+                user=request.user,
+                customer=customer_instance,
+                location=location_instance
+            )
+        except ValidationError as e:
+            return Response({"property_errors": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"property_errors": f"Failed to save property advertisement: {str(e)}"},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if property_image_files:
+            make_first_cover = not PropertyImage.objects.filter(property_ad=property_instance, is_cover=True).exists()
+            for i, image_file in enumerate(property_image_files):
+                try:
+                    PropertyImage.objects.create(
+                        property_ad=property_instance,
+                        image=image_file,
+                        is_cover=(i == 0 and make_first_cover)
+                    )
+                except Exception as e:
+                    print(f"Error saving property image {i}: {e}")
+                    return Response({"image_error": f"Failed to save property image {i + 1}: {str(e)}"},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+        detail_serializer = PropertyDetailSerializer(property_instance, context={'request': request})
+        return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
 
 class PublicPropertyListView(generics.ListAPIView):
     """View for listing ACTIVE properties publicly"""
