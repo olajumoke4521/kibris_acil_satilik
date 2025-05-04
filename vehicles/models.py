@@ -20,6 +20,20 @@ class CarAdvertisement(models.Model):
         ('TRY', 'TRY'),
     ]
     price_type = models.CharField(max_length=3, choices=PRICE_TYPE_CHOICES, default='TRY')
+    VEHICLE_TYPE_CHOICES = [
+        ('sedan', 'Sedan'),
+        ('suv', 'SUV'),
+        ('hatchback', 'Hatchback'),
+        ('pickup', 'Pickup'),
+        ('cabrio', 'Cabrio'),
+        ('minivan', 'Minivan'),
+    ]
+    vehicle_type = models.CharField(max_length=50, choices=VEHICLE_TYPE_CHOICES)
+    ADVERTISEMENT_TYPE_CHOICES = [
+        ('sale', 'Sale'),
+        ('rent', 'Rent'),
+    ]
+    advertisement_type = models.CharField(max_length=50, choices=ADVERTISEMENT_TYPE_CHOICES)
     province = models.CharField(max_length=100, blank=True, null=True)
     neighborhood = models.CharField(max_length=100, blank=True, null=True)
     district = models.CharField(max_length=100, blank=True, null=True)

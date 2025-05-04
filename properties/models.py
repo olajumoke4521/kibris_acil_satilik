@@ -62,10 +62,18 @@ class PropertyAdvertisement(models.Model):
     room_type = models.CharField(max_length=100, choices=ROOM_TYPE_CHOICES)
 
     PROPERTY_TYPE_CHOICES = [
+        ('villa', 'Villa'),
+        ('apartment', 'Apartment'),
+        ('residence', 'Residence'),
+        ('flat', 'Flat'),
+        ('mansion', 'Mansion'),
+    ]
+    property_type = models.CharField(max_length=50, choices=PROPERTY_TYPE_CHOICES)
+    ADVERTISEMENT_TYPE_CHOICES = [
         ('sale', 'Sale'),
         ('rent', 'Rent'),
     ]
-    property_type = models.CharField(max_length=4, choices=PROPERTY_TYPE_CHOICES)
+    advertisement_type = models.CharField(max_length=50, choices=ADVERTISEMENT_TYPE_CHOICES)
     gross_area = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     net_area = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     building_age = models.IntegerField(blank=True, null=True)

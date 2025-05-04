@@ -4,7 +4,7 @@ from . import views
 
 router = DefaultRouter()
 
-router.register(r'admin/cars', views.CarAdminViewSet, basename='admin-car')
+router.register(r'admin', views.CarAdminViewSet, basename='admin-car')
 
 urlpatterns = [
     # Admin URLs
@@ -12,6 +12,10 @@ urlpatterns = [
 
     path('admin/create-customer-and-car/', views.CreateCustomerAndCarView.as_view(), name='create_customer_and_car'),
     # Public URLs
-    path('cars/', views.PublicCarListView.as_view(), name='public-car-list'),
-    path('cars/<uuid:pk>/', views.PublicCarDetailView.as_view(), name='public-car-detail'),
+    path('', views.PublicCarListView.as_view(), name='public-car-list'),
+    path('<uuid:pk>/', views.PublicCarDetailView.as_view(), name='public-car-detail'),
+    path('features/external/', views.CarExternalFeaturesMetadataView.as_view(),
+         name='car-external-features-metadata'),
+    path('features/internal/', views.CarInternalFeaturesMetadataView.as_view(),
+         name='car-internal-features-metadata'),
 ]

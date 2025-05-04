@@ -52,7 +52,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyAdvertisement
-        fields = ('id','advertise_no', 'title', 'price', 'price_type', 'address', 'location_str', 'property_type','room_type','gross_area', 'net_area', 'images', 'published_date')
+        fields = ('id','advertise_no', 'title', 'price', 'price_type', 'address', 'location_str', 'property_type', 'advertisement_type', 'room_type','gross_area', 'net_area', 'images', 'published_date')
 
 
 class PropertyAdminListSerializer(PropertyListSerializer):
@@ -64,7 +64,6 @@ class PropertyAdminListSerializer(PropertyListSerializer):
         fields = PropertyListSerializer.Meta.fields + (
             'advertise_status', 'customer_name', 'user_email', 'created_at'
         )
-
 
 class PropertyDetailSerializer(serializers.ModelSerializer):
     """Serializer for DETAILED view (Public and Admin)"""

@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from knox.auth import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import PropertyAdvertisement, PropertyImage, Location
+from .models import PropertyAdvertisement, PropertyImage, Location, PropertyInteriorFeature, PropertyExternalFeature
 from accounts.models import Customer
 from .serializers import (
     PropertyAdminListSerializer, PropertyDetailSerializer, PropertyAdminCreateUpdateSerializer,
@@ -18,6 +18,8 @@ from .serializers import (
 )
 from accounts.serializers import CustomerSerializer
 from .filters import PropertyFilter
+from django.db import models
+
 
 
 class PropertyAdminViewSet(viewsets.ModelViewSet):
@@ -354,3 +356,35 @@ class PublicPropertyDetailView(generics.RetrieveAPIView):
     def get_queryset(self):
         """Return active, published property advertisements"""
         return PropertyAdvertisement.objects.filter(advertise_status='on').select_related('location', 'customer', 'user', 'explanation', 'external_features', 'interior_features').prefetch_related('images')
+
+
+def get_feature_metadata(model_class):
+    feature_list = []
+    for field in model_class._meta.get_fields():
+        if isinstance(field, models.BooleanField):
+            if field.verbose_name:
+                base_label = field.verbose_name
+            else:
+                base_label = field.name.replace('_', ' ')
+
+            final_label = base_label.title()
+
+            feature_list.append({
+                "key": field.name,
+                "label": final_label
+            })
+    return feature_list
+
+class PropertyExternalFeaturesMetadataView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        external_features = get_feature_metadata(PropertyExternalFeature)
+        return Response(external_features)
+
+class PropertyInteriorFeaturesMetadataView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        interior_features = get_feature_metadata(PropertyInteriorFeature)
+        return Response(interior_features)

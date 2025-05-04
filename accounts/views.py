@@ -8,6 +8,11 @@ from knox.auth import TokenAuthentication
 from .models import User, Customer, CustomerOffer, OfferImage
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, CustomerSerializer, CustomerOfferSerializer, CustomerOfferCreateSerializer
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from collections import OrderedDict
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.reverse import reverse
+from rest_framework.permissions import AllowAny
 
 
 class RegisterView(generics.CreateAPIView):
@@ -166,3 +171,37 @@ class PublicCustomerOfferCreateView(generics.CreateAPIView):
         }
         headers = self.get_success_headers(serializer.data)
         return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class APIRootView(APIView):
+    """
+    API Root view providing links to major application endpoints.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, format=None):
+        data = OrderedDict([
+            # === Accounts Endpoints ===
+            ('register', reverse('register', request=request, format=format)),
+            ('login', reverse('login', request=request, format=format)),
+            ('logout', reverse('logout', request=request, format=format)),
+            ('user-detail', reverse('user-detail', request=request, format=format)),
+            ('customers', reverse('customer-list', request=request, format=format)),
+            ('public-offer-create', reverse('public-offer-create', request=request, format=format)),
+            ('admin-offers', reverse('admin-offer-list', request=request, format=format)),
+
+            # === Properties Endpoints ===
+            ('properties-public-list', reverse('public-property-list', request=request, format=format)),
+            ('properties-admin-list', reverse('admin-property-list', request=request, format=format)),
+            ('properties-features-external', reverse('property-external-features-metadata', request=request, format=format)),
+            ('properties-features-interior', reverse('property-interior-features-metadata', request=request, format=format)),
+
+
+            # === Vehicles Endpoints ===
+             ('vehicles-public-list', reverse('public-car-list', request=request, format=format)),
+             ('vehicles-admin-list', reverse('admin-car-list', request=request, format=format)),
+             ('vehicles-features-external', reverse('car-external-features-metadata', request=request, format=format)),
+             ('vehicles-features-internal', reverse('car-internal-features-metadata', request=request, format=format)),
+
+        ])
+        return Response(data)

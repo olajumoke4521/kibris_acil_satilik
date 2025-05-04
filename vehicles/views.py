@@ -1,5 +1,6 @@
 import json
 
+from django.db import models
 from django.core.exceptions import ValidationError
 from django.db import transaction, IntegrityError
 from django.shortcuts import get_object_or_404
@@ -12,7 +13,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
 from .filters import CarFilter
 from .models import (
-    CarAdvertisement, CarImage
+    CarAdvertisement, CarImage,CarExternalFeature, CarInternalFeature
 )
 from accounts.models import Customer
 from .serializers import (
@@ -248,3 +249,34 @@ class PublicCarDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         return CarAdvertisement.objects.filter(advertise_status='on').select_related('customer', 'user', 'explanation', 'external_features', 'internal_features').prefetch_related('images')
+
+def get_feature_metadata(model_class):
+    feature_list = []
+    for field in model_class._meta.get_fields():
+        if isinstance(field, models.BooleanField):
+            if field.verbose_name:
+                base_label = field.verbose_name
+            else:
+                base_label = field.name.replace('_', ' ')
+
+            final_label = base_label.title()
+
+            feature_list.append({
+                "key": field.name,
+                "label": final_label
+            })
+    return feature_list
+
+class CarExternalFeaturesMetadataView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        external_features = get_feature_metadata(CarExternalFeature)
+        return Response(external_features)
+
+class CarInternalFeaturesMetadataView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        internal_features = get_feature_metadata(CarInternalFeature)
+        return Response(internal_features)
