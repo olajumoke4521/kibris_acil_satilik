@@ -7,9 +7,8 @@ router.register(r'admin', views.PropertyAdminViewSet, basename='admin-property')
 
 urlpatterns = [
     # Admin URLs
-    path('', include(router.urls)),
-
     path('admin/create-customer-and-property/', views.CreateCustomerAndPropertyView.as_view(), name='create_customer_and_ad'),
+    path('', include(router.urls)),
 
     # Public URLs
     path('', views.PublicPropertyListView.as_view(), name='public-property-list'),

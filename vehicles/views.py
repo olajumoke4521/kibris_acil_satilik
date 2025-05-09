@@ -1,7 +1,8 @@
 import json
 
 from django.db import models
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
+from django.core.validators import validate_email
 from django.db import transaction, IntegrityError
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, permissions, status, generics, filters
@@ -31,7 +32,7 @@ class CarAdminViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filterset_class = CarFilter
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['title', 'advertise_no', 'brand', 'model', 'explanation__explanation', 'customer__name']
+    search_fields = ['title', 'advertise_no', 'brand', 'model', 'explanation__explanation', 'customer__name', 'customer__email']
     ordering_fields = ['created_at', 'published_date', 'price', 'title', 'model_year', 'mileage']
     ordering = ['-created_at']
 
@@ -121,86 +122,120 @@ class CarAdminViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class CreateCustomerAndCarView(APIView):
-    """
-    Handles the creation of a Customer (or uses existing) and a related CarAdvertisement
-    (including Features, Explanation, Images) in a single, atomic request.
-    Uses get_or_create for the customer based on a unique key (e.g., email).
-    """
     permission_classes = [permissions.IsAdminUser]
     authentication_classes = [TokenAuthentication]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
-        data = request.data.copy()
+        raw_data = request.data
         customer_instance = None
-        car_instance = None
+        use_existing_customer = False
+        existing_customer_email = None
 
-        customer_data = {}
+        customer_data_for_create = {}
         car_data = {}
         customer_photo_file = None
         car_image_files = request.FILES.getlist('images')
 
         customer_field_keys = ['name', 'email', 'photo', 'mobile_number', 'mobile_number_2', 'mobile_number_3', 'telephone', 'telephone_2',
                                'telephone_3', 'fax', 'type_of_advertise', 'customer_role']
-        customer_unique_key = 'email'
-        nested_car_keys = ['external_features', 'internal_features', 'explanation']
+        nested_car_keys = ['external_features', 'internal_features', 'explanation', 'general_info']
 
-        for key, value in request.data.items():
+        if 'customer' in raw_data and isinstance(raw_data['customer'], str) and raw_data['customer'].strip():
+            potential_email = raw_data['customer'].strip().lower()
+            try:
+                validate_email(potential_email)
+                existing_customer_email = potential_email
+                use_existing_customer = True
+            except ValidationError:
+                return Response({'customer': [f"Invalid email format provided in 'customer' field ('{potential_email}') when trying to specify an existing customer."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        for key, value in raw_data.items():
+            if key == 'customer' and use_existing_customer:
+                continue
+
             if key == 'photo' and value:
-                 if hasattr(value, 'content_type') and 'image' in value.content_type:
-                     customer_photo_file = value
-                 else:
-                      print(f"Warning: Ignoring non-image file provided for 'photo': {key}")
-                 continue
+                if hasattr(value, 'content_type') and 'image' in value.content_type:
+                    customer_photo_file = value
+                continue
 
             if key in customer_field_keys:
-                customer_data[key] = value
-            elif key not in ['images']:
-                if key in nested_car_keys and isinstance(value, str):
-                    try:
-                        if key in ['external_features', 'internal_features']:
-                             car_data[key] = json.loads(value)
-                        else:
-                             car_data[key] = value
-                    except json.JSONDecodeError:
-                        return Response({key: [f"Invalid JSON string provided for {key}."]}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    car_data[key] = value
+                if not use_existing_customer:
+                    if key == 'email':
+                        customer_data_for_create[key] = str(value).strip().lower()
+                    else:
+                        customer_data_for_create[key] = value
+                continue
 
-        lookup_value = customer_data.get(customer_unique_key)
-        if not lookup_value:
-            return Response({customer_unique_key: ["This field is required to find or create a customer."]}, status=status.HTTP_400_BAD_REQUEST)
+            if key == 'images':
+                continue
 
-        defaults_for_create = {k: v for k, v in customer_data.items() if k != customer_unique_key and k != 'photo'}
+            if key in nested_car_keys and isinstance(value, str):
+                 try:
+                     if key in ['external_features', 'internal_features']:
+                          car_data[key] = json.loads(value)
+                     else:
+                          car_data[key] = value
+                 except json.JSONDecodeError:
+                     return Response({key: [f"Invalid JSON string for {key}."]}, status=status.HTTP_400_BAD_REQUEST)
+                 continue
+
+            if key not in ['customer', 'photo', 'images'] + customer_field_keys + nested_car_keys:
+                car_data[key] = value
 
         try:
-            customer_instance, created = Customer.objects.get_or_create(
-                **{customer_unique_key: lookup_value},
-                defaults=defaults_for_create
-            )
+            if use_existing_customer:
+                if not existing_customer_email:
+                     return Response({"customer": ["Could not determine email for existing customer lookup."]}, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    customer_instance = Customer.objects.get(email=existing_customer_email)
+                    if customer_photo_file or any(k in customer_data_for_create for k in customer_field_keys if k != 'email'):
+                        print("WARN: Other customer details (name, photo, etc.) were provided but ignored because the 'customer' field indicated using an existing customer.")
+                except ObjectDoesNotExist:
+                    return Response({"customer": [f"Existing customer with email '{existing_customer_email}' not found."]}, status=status.HTTP_404_NOT_FOUND)
 
-            if created and hasattr(customer_instance, 'user') and not customer_instance.user:
-                 customer_instance.user = request.user
+            else:
+                new_customer_email = customer_data_for_create.get('email')
+                if not new_customer_email:
+                    return Response({'email': ["The 'email' field is required when creating a new customer."]}, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    validate_email(new_customer_email)
+                except ValidationError as e:
+                    return Response({'email': [f"Invalid email format for new customer: {new_customer_email}. Error: {e}"]}, status=status.HTTP_400_BAD_REQUEST)
 
-            if customer_photo_file:
-                customer_instance.photo = customer_photo_file
+                required_customer_fields = {'name', 'mobile_number'}
+                missing_fields = [
+                    field for field in required_customer_fields if not customer_data_for_create.get(field)
+                ]
+                if missing_fields:
+                    errors = {field: ["This field is required."] for field in missing_fields}
+                    return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-                customer_instance.save()
-            elif created and hasattr(customer_instance, 'user') and customer_instance.user == request.user:
-                 customer_instance.save(update_fields=['user'])
+                if Customer.objects.filter(email=new_customer_email).exists():
+                    raise ValidationError({'email': [
+                        f"A customer with this email ('{new_customer_email}') already exists. If you intend to use this customer, provide their email in the 'customer' field."]})
+
+                create_kwargs = {k: v for k, v in customer_data_for_create.items() if k != 'photo'}
+                create_kwargs.setdefault('user', request.user)
+
+                customer_instance = Customer.objects.create(**create_kwargs)
+                if customer_photo_file:
+                    customer_instance.photo = customer_photo_file
+                    customer_instance.save(update_fields=['photo'])
 
         except IntegrityError as e:
-             return Response({"customer_error": f"Database constraint issue during customer get/create: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+             return Response({"customer_error": f"Database error during customer processing: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
         except ValidationError as e:
              return Response({"customer_error": e.message_dict}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"customer_error": f"Failed to get or create customer: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"customer_error": f"Unexpected error processing customer: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        if not customer_instance:
+            return Response({"error": "Customer instance could not be determined."},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         car_serializer = CarAdminCreateUpdateSerializer(data=car_data, context={'request': request})
-
         if not car_serializer.is_valid():
-
             return Response({"car_errors": car_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -211,7 +246,7 @@ class CreateCustomerAndCarView(APIView):
         except ValidationError as e:
              return Response({"car_errors": e.detail}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"car_errors": f"Failed to save car advertisement: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"car_errors": f"Failed to save car advertisement: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if car_image_files:
             make_first_cover = not CarImage.objects.filter(car_ad=car_instance, is_cover=True).exists()

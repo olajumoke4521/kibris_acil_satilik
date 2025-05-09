@@ -1,7 +1,6 @@
 import json
-import uuid
-
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
+from django.core.validators import validate_email
 from django.db import transaction, IntegrityError
 from rest_framework import viewsets, permissions, status, generics, filters
 from rest_framework.decorators import action
@@ -178,14 +177,9 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class CreateCustomerAndPropertyView(APIView):
-    """
-    Handles the creation of a Customer and a related PropertyAdvertisement
-    (including Location, Features, Explanation, Images) in a single, atomic request.
-    """
-    permission_classes = [permissions.IsAdminUser] # Or other appropriate permission
+    permission_classes = [permissions.IsAdminUser]
     authentication_classes = [TokenAuthentication]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-
     def get_or_create_location(self, data):
         province = data.get('province', None)
         district = data.get('district', None)
@@ -204,12 +198,11 @@ class CreateCustomerAndPropertyView(APIView):
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
-        """
-        Handles the POST request to create both Customer and PropertyAdvertisement.
-        """
-        data = request.data.copy()
+        raw_data = request.data
         customer_instance = None
-        property_instance = None
+        use_existing_customer = False
+        existing_customer_email = None
+
 
         customer_data = {}
         property_data = {}
@@ -219,78 +212,109 @@ class CreateCustomerAndPropertyView(APIView):
         customer_field_keys = ['name', 'email', 'photo', 'mobile_number', 'mobile_number_2', 'mobile_number_3',
                                'telephone', 'telephone_2',
                                'telephone_3', 'fax', 'type_of_advertise', 'customer_role']
-        customer_unique_key = 'email'
         nested_property_keys = ['external_features', 'interior_features']
         location_field_keys = ['province', 'district', 'neighborhood']
 
-        for key, value in request.data.items():
+        if 'customer' in raw_data and isinstance(raw_data['customer'], str) and raw_data['customer'].strip():
+            potential_email = raw_data['customer'].strip().lower()
+            try:
+                validate_email(potential_email)
+                existing_customer_email = potential_email
+                use_existing_customer = True
+            except ValidationError:
+                return Response({'customer': [
+                    f"Invalid email format provided in 'customer' field ('{potential_email}') when trying to specify an existing customer."]},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        for key, value in raw_data.items():
+            if key == 'customer' and use_existing_customer:
+                continue
             if key == 'photo' and value:
                 if hasattr(value, 'content_type') and 'image' in value.content_type:
                     customer_photo_file = value
-                else:
-                    print(f"Warning: Ignoring non-image file provided for 'photo': {key}")
+                continue
+            if key in customer_field_keys:
+                if not use_existing_customer:
+                    if key == 'email':
+                        customer_data[key] = str(value).strip().lower()
+                    else:
+                        customer_data[key] = value
                 continue
 
-            if key in customer_field_keys:
-                customer_data[key] = value
-            elif key not in ['images']:
-                if key in nested_property_keys and isinstance(value, str):
-                    try:
+            if key == 'images':
+                continue
+
+            if key in nested_property_keys and isinstance(value, str):
+                try:
+                    if key in ['external_features', 'interior_features']:
                         property_data[key] = json.loads(value)
-                    except json.JSONDecodeError:
-                        return Response({key: [f"Invalid JSON string provided for {key}."]},
-                                        status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    property_data[key] = value
-
-        lookup_value = customer_data.get(customer_unique_key)
-        if not lookup_value:
-            return Response({customer_unique_key: ["This field is required to find or create a customer."]},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        defaults_for_create = {}
-        # Define which customer keys expect a single value
-        single_value_customer_keys = ['name', 'mobile_number', 'mobile_number_2', 'mobile_number_3', 'telephone',
-                                      'telephone_2',
-                                      'telephone_3', 'fax', 'type_of_advertise', 'customer_role']
-
-        for key, value in customer_data.items():
-            if key != customer_unique_key and key != 'photo':
-                if key in single_value_customer_keys and isinstance(value, list):
-                    if value:
-                        print(f"Warning: Received list for customer key '{key}'. Using first element: '{value[0]}'")
-                        value = value[0]
                     else:
-                        print(f"Warning: Received empty list for customer key '{key}'. Skipping.")
-                        continue
-                defaults_for_create[key] = value
+                        property_data[key] = value
+                except json.JSONDecodeError:
+                    return Response({key: [f"Invalid JSON string provided for {key}."]},status=status.HTTP_400_BAD_REQUEST)
 
+            if key not in ['customer', 'photo', 'images'] + customer_field_keys + nested_property_keys:
+                property_data[key] = value
         try:
-            customer_instance, created = Customer.objects.get_or_create(
-                **{customer_unique_key: lookup_value},
-                defaults=defaults_for_create
-            )
+            if use_existing_customer:
+                if not existing_customer_email:
+                    return Response({"customer": ["Could not determine email for existing customer lookup."]},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    customer_instance = Customer.objects.get(email=existing_customer_email)
+                    if customer_photo_file or any(
+                            k in customer_data for k in customer_field_keys if k != 'email'):
+                        print(
+                            "WARN: Other customer details (name, photo, etc.) were provided but ignored because the 'customer' field indicated using an existing customer.")
+                except ObjectDoesNotExist:
+                    return Response(
+                        {"customer": [f"Existing customer with email '{existing_customer_email}' not found."]},
+                        status=status.HTTP_404_NOT_FOUND)
 
-            save_customer_needed = False
-            if created and hasattr(customer_instance, 'user') and not customer_instance.user:
-                customer_instance.user = request.user
-                save_customer_needed = True
+            else:
+                new_customer_email = customer_data.get('email')
+                if not new_customer_email:
+                    return Response({'email': ["The 'email' field is required when creating a new customer."]},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    validate_email(new_customer_email)
+                except ValidationError as e:
+                    return Response(
+                        {'email': [f"Invalid email format for new customer: {new_customer_email}. Error: {e}"]},
+                        status=status.HTTP_400_BAD_REQUEST)
 
-            if customer_photo_file:
-                customer_instance.photo = customer_photo_file
-                save_customer_needed = True
+                required_customer_fields = {'name', 'mobile_number'}
+                missing_fields = [
+                    field for field in required_customer_fields if not customer_data.get(field)
+                ]
+                if missing_fields:
+                    errors = {field: ["This field is required."] for field in missing_fields}
+                    return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-            if save_customer_needed:
-                customer_instance.save()
+                if Customer.objects.filter(email=new_customer_email).exists():
+                    raise ValidationError({'email': [
+                        f"A customer with this email ('{new_customer_email}') already exists. If you intend to use this customer, provide their email in the 'customer' field."]})
+
+                create_kwargs = {k: v for k, v in customer_data.items() if k != 'photo'}
+                create_kwargs.setdefault('user', request.user)
+
+                customer_instance = Customer.objects.create(**create_kwargs)
+                if customer_photo_file:
+                    customer_instance.photo = customer_photo_file
+                    customer_instance.save(update_fields=['photo'])
 
         except IntegrityError as e:
-            return Response({"customer_error": f"Database constraint issue during customer get/create: {str(e)}"},
+            return Response({"customer_error": f"Database error during customer processing: {str(e)}"},
                             status=status.HTTP_400_BAD_REQUEST)
         except ValidationError as e:
             return Response({"customer_error": e.message_dict}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"customer_error": f"Failed to get or create customer: {str(e)}"},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response({"customer_error": f"Unexpected error processing customer: {str(e)}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not customer_instance:
+            return Response({"error": "Customer instance could not be determined."},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
         location_instance = self.get_or_create_location(property_data)
