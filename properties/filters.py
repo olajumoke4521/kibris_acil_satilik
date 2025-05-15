@@ -4,25 +4,24 @@ from .models import PropertyAdvertisement
 
 
 class PropertyFilter(filters.FilterSet):
-    price_min = filters.NumberFilter(field_name="price", lookup_expr='gte')
-    price_max = filters.NumberFilter(field_name="price", lookup_expr='lte')
-    province = filters.CharFilter(field_name="location__province")
-    district = filters.CharFilter(field_name="location__district")
-    neighborhood = filters.CharFilter(field_name="location__neighborhood")
-    property_type = filters.CharFilter()
-    room_type = filters.CharFilter()
-    building_age = filters.NumberFilter()
-    warming_type = filters.CharFilter()
-    furnished = filters.BooleanFilter()
-    has_elevator = filters.BooleanFilter(field_name="external_features__elevator")
-    has_balcony = filters.BooleanFilter(field_name="interior_features__balcony")
-    has_garden = filters.BooleanFilter(field_name="external_features__gardened")
+    minPrice = filters.NumberFilter(field_name="price", lookup_expr='gte')
+    maxPrice = filters.NumberFilter(field_name="price", lookup_expr='lte')
+    city = filters.CharFilter(field_name="location__province",
+                                 lookup_expr='iexact')
+    location = filters.CharFilter(field_name="location__district", lookup_expr='iexact',
+                                              label="Location (District)")
+    type = filters.CharFilter(field_name="property_type", lookup_expr='iexact', label="Property Type")
+    roomType = filters.CharFilter(field_name="room_type", lookup_expr='iexact')
+
 
     class Meta:
         model = PropertyAdvertisement
-        fields = [
-            'province', 'district', 'neighborhood', 'property_type',
-            'room_type', 'price_min', 'price_max',
-            'building_age', 'furnished', 'has_elevator', 'has_balcony',
-            'has_garden'
-        ]
+        fields = {
+            'price': ['gte', 'lte'],
+            'location__province': ['exact', 'iexact'],
+            'location__district': ['exact', 'iexact'],
+            'property_type': ['exact', 'iexact'],
+            'room_type': ['exact', 'iexact'],
+            'advertisement_type': ['exact', 'iexact'],
+            'advertise_status': ['exact'],
+        }

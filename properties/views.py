@@ -13,12 +13,13 @@ from .models import PropertyAdvertisement, PropertyImage, Location, PropertyInte
 from accounts.models import Customer
 from .serializers import (
     PropertyAdminListSerializer, PropertyDetailSerializer, PropertyAdminCreateUpdateSerializer,
-    PropertyListSerializer, PropertyImageSerializer
+    PropertyListSerializer, PropertyImageSerializer, LatestAdvertisementSerializer
 )
 from accounts.serializers import CustomerSerializer
 from .filters import PropertyFilter
 from django.db import models
 
+from vehicles.models import CarAdvertisement
 
 
 class PropertyAdminViewSet(viewsets.ModelViewSet):
@@ -412,3 +413,217 @@ class PropertyInteriorFeaturesMetadataView(APIView):
     def get(self, request, *args, **kwargs):
         interior_features = get_feature_metadata(PropertyInteriorFeature)
         return Response(interior_features)
+
+class LatestAdvertisementsView(APIView):
+    permission_classes = [permissions.AllowAny]
+    AD_COUNT_LIMIT =6
+
+    def get(self, request, *args, **kwargs):
+        latest_properties_qs = PropertyAdvertisement.objects.filter(
+            advertise_status='on'
+        ).select_related(
+            'location'
+        ).prefetch_related(
+            'images'
+        ).order_by('-published_date')[:self.AD_COUNT_LIMIT]
+
+        latest_cars_qs = CarAdvertisement.objects.filter(
+            advertise_status='on'
+        ).prefetch_related(
+            'images'
+        ).order_by('-published_date')[:self.AD_COUNT_LIMIT]
+
+        combined_ads_list = list(latest_properties_qs) + list(latest_cars_qs)
+
+        combined_ads_list.sort(key=lambda ad: ad.published_date, reverse=True)
+
+        final_latest_ads_to_serialize = combined_ads_list[:self.AD_COUNT_LIMIT]
+
+        serializer = LatestAdvertisementSerializer(
+            final_latest_ads_to_serialize,
+            many=True,
+            context={'request': request}
+        )
+
+        return Response(serializer.data)
+
+
+def get_choices_as_list_of_dicts(choices_tuple):
+    """Helper function to convert Django choices tuple to a list of dicts."""
+    return [{"value": choice[0], "label": choice[1]} for choice in choices_tuple]
+
+
+class PropertyFilterOptionsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        property_types = get_choices_as_list_of_dicts(PropertyAdvertisement.PROPERTY_TYPE_CHOICES)
+        room_types = get_choices_as_list_of_dicts(PropertyAdvertisement.ROOM_TYPE_CHOICES)
+
+        provinces_qs = Location.objects.values_list('province', flat=True).distinct().order_by('province')
+
+        locations_data = []
+        for province_name in provinces_qs:
+
+            districts_qs = Location.objects.filter(
+                province=province_name,
+                district__isnull=False
+            ).exclude(
+                district__exact=''
+            ).values_list('district', flat=True).distinct().order_by('district')
+
+            locations_data.append({
+                "city": province_name,
+                "districts": list(districts_qs)
+            })
+
+
+        data = {
+            "property_types": property_types,
+            "room_types": room_types,
+            "locations": locations_data,
+            "warming_types": get_choices_as_list_of_dicts(PropertyAdvertisement.WARMING_TYPE_CHOICES),
+            "currency_types": get_choices_as_list_of_dicts(PropertyAdvertisement.CURRENCY_TYPE_CHOICES),
+            "advertisement_types": get_choices_as_list_of_dicts(PropertyAdvertisement.ADVERTISEMENT_TYPE_CHOICES),
+        }
+        return Response(data)
+
+
+PREDEFINED_CAR_DATA = {
+    "BMW": {
+        "series": ["1 Series", "2 Series", "3 Series", "4 Series", "5 Series", "7 Series", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "Z4", "M Series"],
+    },
+    "Mercedes-Benz": {
+        "series": ["A-Class", "C-Class", "E-Class", "S-Class", "CLA", "CLS", "GLA", "GLB", "GLC", "GLE", "GLS", "G-Class", "AMG GT"]
+    },
+    "Audi": {
+        "series": ["A1", "A3", "A4", "A5", "A6", "A7", "A8", "Q2", "Q3", "Q5", "Q7", "Q8", "TT", "R8", "e-tron"]
+    },
+    "Volkswagen": {
+        "series": ["Polo", "Golf", "Passat", "Tiguan", "T-Roc", "Touareg", "Arteon", "ID.3", "ID.4"]
+    },
+    "Toyota": {
+        "series": ["Yaris", "Corolla", "Camry", "RAV4", "C-HR", "Hilux", "Land Cruiser", "Supra", "Prius"]
+    },
+    "Honda": {
+        "series": ["Jazz", "Civic", "HR-V", "CR-V", "NSX"]
+    },
+    "Ford": {
+        "series": ["Fiesta", "Focus", "Mondeo", "Puma", "Kuga", "Mustang", "Ranger"]
+    },
+    "Hyundai": {
+        "series": ["i10", "i20", "i30", "Elantra", "Tucson", "Santa Fe", "Kona"]
+    },
+    "Kia": {
+        "series": ["Picanto", "Rio", "Ceed", "Sportage", "Sorento", "Stonic"]
+    },
+    "Nissan": {
+        "series": ["Micra", "Juke", "Qashqai", "X-Trail", "Navara", "GT-R"]
+    },
+    "Peugeot": {
+        "series": ["208", "308", "508", "2008", "3008", "5008"]
+    },
+    "Renault": {
+        "series": ["Clio", "Megane", "Captur", "Kadjar"]
+    },
+    "Skoda": {
+        "series": ["Fabia", "Octavia", "Superb", "Kamiq", "Karoq", "Kodiaq"]
+    },
+    "Volvo": {
+        "series": ["XC40", "XC60", "XC90", "S60", "S90", "V60", "V90"]
+    }
+}
+
+
+class CombinedFilterOptionsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get_property_options(self):
+        property_types = get_choices_as_list_of_dicts(PropertyAdvertisement.PROPERTY_TYPE_CHOICES)
+        room_types = get_choices_as_list_of_dicts(PropertyAdvertisement.ROOM_TYPE_CHOICES)
+        warming_types = get_choices_as_list_of_dicts(PropertyAdvertisement.WARMING_TYPE_CHOICES)
+
+        provinces_qs = Location.objects.values_list('province', flat=True).distinct().order_by('province')
+        city_areas_data = []
+        cities_for_dropdown = []
+
+        for province_name in provinces_qs:
+            cities_for_dropdown.append(
+                {"value": province_name.lower(), "label": province_name})
+
+            districts_qs = Location.objects.filter(
+                province=province_name,
+                district__isnull=False
+            ).exclude(
+                district__exact=''
+            ).values_list('district', flat=True).distinct().order_by('district')
+
+            city_areas_data.append({
+                "city": province_name,
+                "areas": list(districts_qs)
+            })
+
+        return {
+            "propertyTypes": property_types,
+            "cities": cities_for_dropdown,
+            "locations": city_areas_data,
+            "roomTypes": room_types,
+
+            "warmingTypes": warming_types,
+        }
+
+    def get_car_options(self):
+        vehicle_types = get_choices_as_list_of_dicts(CarAdvertisement.VEHICLE_TYPE_CHOICES)
+        gear_types = get_choices_as_list_of_dicts(CarAdvertisement.GEAR_TYPE_CHOICES)
+        steering_types = get_choices_as_list_of_dicts(CarAdvertisement.STEERING_TYPE_CHOICES)
+        price_types = get_choices_as_list_of_dicts(CarAdvertisement.PRICE_TYPE_CHOICES)  # Currency
+
+        predefined_brands_list = []
+        for brand_name in PREDEFINED_CAR_DATA.keys():
+            predefined_brands_list.append(
+                {"value": brand_name.lower().replace("-", "").replace(" ", ""), "label": brand_name})
+        predefined_brands_list.sort(key=lambda x: x['label'])
+
+        brand_series_structure = []
+        for brand_name, data in PREDEFINED_CAR_DATA.items():
+            series_list = [{"value": s.lower().replace(" ", "-"), "label": s} for s in data.get("series", [])]
+            series_list.sort(key=lambda x: x['label'])
+            brand_series_structure.append({
+                "brand": {"value": brand_name.lower().replace("-", "").replace(" ", ""), "label": brand_name},
+                "series": series_list
+            })
+        brand_series_structure.sort(key=lambda x: x['brand']['label'])
+
+
+        model_years_qs = CarAdvertisement.objects.values_list('model_year', flat=True).distinct().order_by(
+            '-model_year')
+        model_years = [{"value": str(year), "label": str(year)} for year in model_years_qs if year is not None]
+        if not model_years:
+            import datetime
+            current_year = datetime.date.today().year
+            model_years = [{"value": str(year), "label": str(year)} for year in
+                           range(current_year, current_year - 25, -1)]
+
+
+        all_db_models_qs = CarAdvertisement.objects.filter(model__isnull=False).exclude(model__exact='').values_list(
+            'model', flat=True).distinct().order_by('model')
+        all_db_models_for_dropdown = [{"value": m.lower(), "label": m} for m in all_db_models_qs]
+
+
+        return {
+            "vehicleTypes": vehicle_types,
+            "brands": predefined_brands_list,
+            "brandSeriesData": brand_series_structure,
+            "modelYears": model_years,
+            "gearTypes": gear_types,
+            "steeringTypes": steering_types,
+            "priceTypes": price_types,  # Currency
+        }
+
+    def get(self, request, *args, **kwargs):
+        data = {
+            "property": self.get_property_options(),
+            "car": self.get_car_options()
+        }
+        return Response(data)
+

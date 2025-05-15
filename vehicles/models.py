@@ -6,7 +6,7 @@ from accounts.models import User, Customer
 
 
 class CarAdvertisement(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     advertise_no = models.CharField(max_length=20, blank=True, null=True)
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='car_advertisements')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='car_advertisements')
@@ -53,6 +53,7 @@ class CarAdvertisement(models.Model):
     ]
     gear_type = models.CharField(max_length=15, choices=GEAR_TYPE_CHOICES)
     color = models.CharField(max_length=50)
+
     brand = models.CharField(max_length=100, blank=True, null=True)
     model = models.CharField(max_length=100, blank=True, null=True)
     model_year = models.IntegerField()
@@ -74,7 +75,7 @@ class CarAdvertisement(models.Model):
 
 
 class CarImage(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     car_ad = models.ForeignKey(CarAdvertisement, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(
         upload_to='car_images/',
@@ -98,7 +99,7 @@ class CarImage(models.Model):
 
 
 class CarExplanation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     car_ad = models.OneToOneField(CarAdvertisement, on_delete=models.CASCADE, related_name='explanation')
     explanation = models.TextField()
 
@@ -107,7 +108,7 @@ class CarExplanation(models.Model):
 
 
 class CarInternalFeature(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     car_ad = models.OneToOneField(CarAdvertisement, on_delete=models.CASCADE, related_name='internal_features')
 
     fabric_armchair = models.BooleanField(default=False)
@@ -134,7 +135,7 @@ class CarInternalFeature(models.Model):
 
 
 class CarExternalFeature(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     car_ad = models.OneToOneField(CarAdvertisement, on_delete=models.CASCADE, related_name='external_features')
 
     headlamp_xenon = models.BooleanField(default=False)

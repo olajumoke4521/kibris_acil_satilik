@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from accounts.views import APIRootView
+from properties.views import LatestAdvertisementsView, CombinedFilterOptionsView
 
 
 urlpatterns = [
@@ -27,6 +28,9 @@ urlpatterns = [
     path('api/accounts/', include('accounts.urls')),
     path('api/properties/', include('properties.urls')),
     path('api/cars/', include('vehicles.urls')),
+    path('api/latest-advertisements/', LatestAdvertisementsView.as_view(), name='public-latest-combined-ads'),
+    path('api/filter-options/', CombinedFilterOptionsView.as_view(), name='public-all-filter-options'),
+
 ]
 
 # Serve media files in development

@@ -8,6 +8,10 @@ from .models import (
 from accounts.models import Customer
 from accounts.serializers import CustomerSerializer
 
+from vehicles.models import CarAdvertisement
+from vehicles.serializers import CarListSerializer
+
+
 class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
@@ -101,6 +105,7 @@ class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
         try:
             email = str(value).strip().lower()
             validate_email(email)
+            
             customer_instance = Customer.objects.get(email=email)
             return customer_instance
         except ValidationError:
@@ -167,3 +172,20 @@ class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
             )
 
         return instance
+
+class LatestAdvertisementSerializer(serializers.Serializer):
+    def to_representation(self, instance):
+        request = self.context.get('request')
+        representation = None
+
+        if isinstance(instance, PropertyAdvertisement):
+            serializer = PropertyListSerializer(instance, context={'request': request})
+            representation = serializer.data
+        elif isinstance(instance, CarAdvertisement):
+            serializer = CarListSerializer(instance, context={'request': request})
+            representation = serializer.data
+            representation['advertisement_type'] = 'car'
+        else:
+            return None
+
+        return representation

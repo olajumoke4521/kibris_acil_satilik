@@ -6,7 +6,7 @@ from accounts.models import User, Customer
 from django.conf import settings
 
 class Location(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     province = models.CharField(max_length=100)
     district = models.CharField(max_length=100, blank=True, null=True)
     neighborhood = models.CharField(max_length=100, blank=True, null=True)
@@ -22,7 +22,7 @@ class Location(models.Model):
         return ' / '.join(part for part in parts if part)
 
 class PropertyAdvertisement(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     advertise_no = models.CharField(max_length=20, blank=True, null=True)
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='property_advertisements')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='property_advertisements')
@@ -57,7 +57,17 @@ class PropertyAdvertisement(models.Model):
         ('4+1', '4+1'),
         ('4+2', '4+2'),
         ('5+1', '5+1'),
-        ('6+', '6+'),
+        ('5+2', '5+2'),
+        ('5+3', '5+3'),
+        ('5+4', '5+4'),
+        ('6+1', '6+1'),
+        ('6+2', '6+2'),
+        ('6+3', '6+3'),
+        ('6+4', '6+4'),
+        ('7+1', '7+1'),
+        ('7+2', '7+2'),
+        ('7+3', '7+3'),
+        ('8+', '8+'),
     ]
     room_type = models.CharField(max_length=100, choices=ROOM_TYPE_CHOICES)
 
@@ -65,8 +75,14 @@ class PropertyAdvertisement(models.Model):
         ('villa', 'Villa'),
         ('apartment', 'Apartment'),
         ('residence', 'Residence'),
-        ('flat', 'Flat'),
-        ('mansion', 'Mansion'),
+        ('twin_villa', 'Twin Villa'),
+        ('penthouse', 'Penthouse'),
+        ('bungalow', 'Bungalow'),
+        ('family_house', 'Family House'),
+        ('complete_building', 'Complete Building'),
+        ('timeshare', 'Timeshare'),
+        ('abandoned_building', 'Abandoned Building'),
+        ('half_construction', 'Half Construction'),
     ]
     property_type = models.CharField(max_length=50, choices=PROPERTY_TYPE_CHOICES)
     ADVERTISEMENT_TYPE_CHOICES = [
@@ -104,7 +120,7 @@ class PropertyAdvertisement(models.Model):
 
 
 class PropertyImage(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     property_ad = models.ForeignKey(PropertyAdvertisement, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(
         upload_to='property_images/',
@@ -127,7 +143,7 @@ class PropertyImage(models.Model):
 
 
 class PropertyExplanation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     property_ad = models.OneToOneField(PropertyAdvertisement, on_delete=models.CASCADE, related_name='explanation')
     explanation = models.TextField()
 
@@ -136,7 +152,7 @@ class PropertyExplanation(models.Model):
 
 
 class PropertyExternalFeature(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     property_ad = models.OneToOneField(PropertyAdvertisement, on_delete=models.CASCADE, related_name='external_features')
     elevator = models.BooleanField(default=False)
     gardened = models.BooleanField(default=False)
