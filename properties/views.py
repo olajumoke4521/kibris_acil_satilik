@@ -20,7 +20,11 @@ from .filters import PropertyFilter
 from django.db import models
 
 from vehicles.models import CarAdvertisement
+import json
+import os
+from django.conf import settings
 
+LOCATION_JSON_FILE_PATH = os.path.join(settings.BASE_DIR,  'code.json')
 
 class PropertyAdminViewSet(viewsets.ModelViewSet):
     """
@@ -538,35 +542,89 @@ PREDEFINED_CAR_DATA = {
 class CombinedFilterOptionsView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    def load_location_data_from_json(self):
+        try:
+            with open(LOCATION_JSON_FILE_PATH, 'r', encoding='utf-8') as f:
+                raw_locations = json.load(f)
+        except FileNotFoundError:
+            print(f"ERROR: Location JSON file not found at {LOCATION_JSON_FILE_PATH}")
+            return [], []
+        except json.JSONDecodeError:
+            print(f"ERROR: Could not decode JSON from {LOCATION_JSON_FILE_PATH}")
+            return [], []
+
+        cities_for_dropdown = []
+        city_areas_data_dict = {}
+
+        seen_provinces = set()
+        for loc in raw_locations:
+            province_name = loc.get("province")
+            if province_name and province_name not in seen_provinces:
+
+                cities_for_dropdown.append({
+                    "value": province_name.lower().replace(" ", "-"),
+                    "label": province_name
+                })
+                seen_provinces.add(province_name)
+
+
+        cities_for_dropdown.sort(key=lambda x: x['label'])
+
+        for loc in raw_locations:
+            province_name = loc.get("province")
+            district_name = loc.get("district")
+
+            if not province_name or not district_name:
+                continue
+
+            province_key = province_name.lower().replace(" ", "-")  # Consistent key
+
+            if province_key not in city_areas_data_dict:
+                city_areas_data_dict[province_key] = {
+                    "city_label": province_name,
+                    "areas": []
+                }
+
+
+            district_value = district_name.lower().replace(" ", "-").replace("(", "").replace(")", "")  # Basic slug
+            city_areas_data_dict[province_key]["areas"].append({
+                "value": district_value,
+                "label": district_name
+            })
+
+
+        final_city_areas_data = []
+        for province_key, data in city_areas_data_dict.items():
+
+            unique_areas = []
+            seen_area_values = set()
+            for area in data["areas"]:
+                if area["value"] not in seen_area_values:
+                    unique_areas.append(area)
+                    seen_area_values.add(area["value"])
+            unique_areas.sort(key=lambda x: x['label'])
+
+            final_city_areas_data.append({
+                "city_value": province_key,
+                "city_label": data["city_label"],
+                "areas": unique_areas
+            })
+
+        final_city_areas_data.sort(key=lambda x: x['city_label'])
+
+        return cities_for_dropdown, final_city_areas_data
+
     def get_property_options(self):
         property_types = get_choices_as_list_of_dicts(PropertyAdvertisement.PROPERTY_TYPE_CHOICES)
         room_types = get_choices_as_list_of_dicts(PropertyAdvertisement.ROOM_TYPE_CHOICES)
         warming_types = get_choices_as_list_of_dicts(PropertyAdvertisement.WARMING_TYPE_CHOICES)
 
-        provinces_qs = Location.objects.values_list('province', flat=True).distinct().order_by('province')
-        city_areas_data = []
-        cities_for_dropdown = []
-
-        for province_name in provinces_qs:
-            cities_for_dropdown.append(
-                {"value": province_name.lower(), "label": province_name})
-
-            districts_qs = Location.objects.filter(
-                province=province_name,
-                district__isnull=False
-            ).exclude(
-                district__exact=''
-            ).values_list('district', flat=True).distinct().order_by('district')
-
-            city_areas_data.append({
-                "city": province_name,
-                "areas": list(districts_qs)
-            })
+        cities_for_dropdown, city_areas_data = self.load_location_data_from_json()
 
         return {
             "propertyTypes": property_types,
             "cities": cities_for_dropdown,
-            "locations": city_areas_data,
+            "cityAreas": city_areas_data,
             "roomTypes": room_types,
 
             "warmingTypes": warming_types,
