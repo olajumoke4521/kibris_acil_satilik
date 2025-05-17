@@ -22,6 +22,4 @@ class PropertyFilter(filters.FilterSet):
             'location__district': ['exact', 'iexact'],
             'property_type': ['exact', 'iexact'],
             'room_type': ['exact', 'iexact'],
-            'advertisement_type': ['exact', 'iexact'],
-            'advertise_status': ['exact'],
         }

@@ -1,7 +1,11 @@
 import json
+import os
+import datetime
+from django.conf import settings
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import validate_email
 from django.db import transaction, IntegrityError
+from django.db import models
 from rest_framework import viewsets, permissions, status, generics, filters
 from rest_framework.decorators import action
 from rest_framework.views import APIView
@@ -17,14 +21,10 @@ from .serializers import (
 )
 from accounts.serializers import CustomerSerializer
 from .filters import PropertyFilter
-from django.db import models
-
 from vehicles.models import CarAdvertisement
-import json
-import os
-from django.conf import settings
+from .constants import PREDEFINED_CAR_DATA, PROPERTY_TYPE_TR_LABELS_MAP, VEHICLE_TYPE_TR_LABELS_MAP
 
-LOCATION_JSON_FILE_PATH = os.path.join(settings.BASE_DIR,  'code.json')
+LOCATION_JSON_FILE_PATH = os.path.join(settings.BASE_DIR,  'location.json')
 
 class PropertyAdminViewSet(viewsets.ModelViewSet):
     """
@@ -457,87 +457,25 @@ def get_choices_as_list_of_dicts(choices_tuple):
     return [{"value": choice[0], "label": choice[1]} for choice in choices_tuple]
 
 
-class PropertyFilterOptionsView(APIView):
-    permission_classes = [permissions.AllowAny]
+def get_bilingual_choices_as_list_of_dicts(choices_tuple, tr_label_map=None, en_label_map=None):
+    bilingual_list = []
+    for value, default_label in choices_tuple:
+        if tr_label_map and isinstance(tr_label_map, dict) and value in tr_label_map:
+            label_tr = tr_label_map[value]
+        else:
+            label_tr = default_label
 
-    def get(self, request, *args, **kwargs):
-        property_types = get_choices_as_list_of_dicts(PropertyAdvertisement.PROPERTY_TYPE_CHOICES)
-        room_types = get_choices_as_list_of_dicts(PropertyAdvertisement.ROOM_TYPE_CHOICES)
+        if en_label_map and isinstance(en_label_map, dict) and value in en_label_map:
+            label_en = en_label_map[value]
+        else:
+            label_en = default_label
 
-        provinces_qs = Location.objects.values_list('province', flat=True).distinct().order_by('province')
-
-        locations_data = []
-        for province_name in provinces_qs:
-
-            districts_qs = Location.objects.filter(
-                province=province_name,
-                district__isnull=False
-            ).exclude(
-                district__exact=''
-            ).values_list('district', flat=True).distinct().order_by('district')
-
-            locations_data.append({
-                "city": province_name,
-                "districts": list(districts_qs)
-            })
-
-
-        data = {
-            "property_types": property_types,
-            "room_types": room_types,
-            "locations": locations_data,
-            "warming_types": get_choices_as_list_of_dicts(PropertyAdvertisement.WARMING_TYPE_CHOICES),
-            "currency_types": get_choices_as_list_of_dicts(PropertyAdvertisement.CURRENCY_TYPE_CHOICES),
-            "advertisement_types": get_choices_as_list_of_dicts(PropertyAdvertisement.ADVERTISEMENT_TYPE_CHOICES),
-        }
-        return Response(data)
-
-
-PREDEFINED_CAR_DATA = {
-    "BMW": {
-        "series": ["1 Series", "2 Series", "3 Series", "4 Series", "5 Series", "7 Series", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "Z4", "M Series"],
-    },
-    "Mercedes-Benz": {
-        "series": ["A-Class", "C-Class", "E-Class", "S-Class", "CLA", "CLS", "GLA", "GLB", "GLC", "GLE", "GLS", "G-Class", "AMG GT"]
-    },
-    "Audi": {
-        "series": ["A1", "A3", "A4", "A5", "A6", "A7", "A8", "Q2", "Q3", "Q5", "Q7", "Q8", "TT", "R8", "e-tron"]
-    },
-    "Volkswagen": {
-        "series": ["Polo", "Golf", "Passat", "Tiguan", "T-Roc", "Touareg", "Arteon", "ID.3", "ID.4"]
-    },
-    "Toyota": {
-        "series": ["Yaris", "Corolla", "Camry", "RAV4", "C-HR", "Hilux", "Land Cruiser", "Supra", "Prius"]
-    },
-    "Honda": {
-        "series": ["Jazz", "Civic", "HR-V", "CR-V", "NSX"]
-    },
-    "Ford": {
-        "series": ["Fiesta", "Focus", "Mondeo", "Puma", "Kuga", "Mustang", "Ranger"]
-    },
-    "Hyundai": {
-        "series": ["i10", "i20", "i30", "Elantra", "Tucson", "Santa Fe", "Kona"]
-    },
-    "Kia": {
-        "series": ["Picanto", "Rio", "Ceed", "Sportage", "Sorento", "Stonic"]
-    },
-    "Nissan": {
-        "series": ["Micra", "Juke", "Qashqai", "X-Trail", "Navara", "GT-R"]
-    },
-    "Peugeot": {
-        "series": ["208", "308", "508", "2008", "3008", "5008"]
-    },
-    "Renault": {
-        "series": ["Clio", "Megane", "Captur", "Kadjar"]
-    },
-    "Skoda": {
-        "series": ["Fabia", "Octavia", "Superb", "Kamiq", "Karoq", "Kodiaq"]
-    },
-    "Volvo": {
-        "series": ["XC40", "XC60", "XC90", "S60", "S90", "V60", "V90"]
-    }
-}
-
+        bilingual_list.append({
+            "value": value,
+            "label_tr": label_tr,
+            "label_en": label_en
+        })
+    return bilingual_list
 
 class CombinedFilterOptionsView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -548,93 +486,80 @@ class CombinedFilterOptionsView(APIView):
                 raw_locations = json.load(f)
         except FileNotFoundError:
             print(f"ERROR: Location JSON file not found at {LOCATION_JSON_FILE_PATH}")
-            return [], []
+            return []
         except json.JSONDecodeError:
             print(f"ERROR: Could not decode JSON from {LOCATION_JSON_FILE_PATH}")
-            return [], []
+            return []
 
-        cities_for_dropdown = []
-        city_areas_data_dict = {}
-
-        seen_provinces = set()
-        for loc in raw_locations:
-            province_name = loc.get("province")
-            if province_name and province_name not in seen_provinces:
-
-                cities_for_dropdown.append({
-                    "value": province_name.lower().replace(" ", "-"),
-                    "label": province_name
-                })
-                seen_provinces.add(province_name)
-
-
-        cities_for_dropdown.sort(key=lambda x: x['label'])
+        grouped_by_province_value = {}
 
         for loc in raw_locations:
-            province_name = loc.get("province")
+            province_val = loc.get("province_value")
+            province_l_tr = loc.get("province_label_tr")
+            province_l_en = loc.get("province_label_en")
             district_name = loc.get("district")
 
-            if not province_name or not district_name:
+            if not province_val or not district_name:
                 continue
 
-            province_key = province_name.lower().replace(" ", "-")  # Consistent key
-
-            if province_key not in city_areas_data_dict:
-                city_areas_data_dict[province_key] = {
-                    "city_label": province_name,
-                    "areas": []
+            if province_val not in grouped_by_province_value:
+                grouped_by_province_value[province_val] = {
+                    "city": {
+                        "value": province_val,
+                        "label_tr": province_l_tr,
+                        "label_en": province_l_en
+                    },
+                    "areas_temp_list": []
                 }
 
-
-            district_value = district_name.lower().replace(" ", "-").replace("(", "").replace(")", "")  # Basic slug
-            city_areas_data_dict[province_key]["areas"].append({
-                "value": district_value,
+            district_filter_value = district_name.lower().replace(" ", "-").replace("(", "").replace(")", "")
+            area_object = {
+                "value": district_filter_value,
                 "label": district_name
-            })
+            }
 
+            grouped_by_province_value[province_val]["areas_temp_list"].append(area_object)
 
         final_city_areas_data = []
-        for province_key, data in city_areas_data_dict.items():
-
+        for province_value_key, city_data_group in grouped_by_province_value.items():
             unique_areas = []
             seen_area_values = set()
-            for area in data["areas"]:
+            sorted_areas = sorted(city_data_group["areas_temp_list"], key=lambda x: x['label'])
+
+            for area in sorted_areas:
                 if area["value"] not in seen_area_values:
                     unique_areas.append(area)
                     seen_area_values.add(area["value"])
-            unique_areas.sort(key=lambda x: x['label'])
 
             final_city_areas_data.append({
-                "city_value": province_key,
-                "city_label": data["city_label"],
+                "city": city_data_group["city"],
                 "areas": unique_areas
             })
 
-        final_city_areas_data.sort(key=lambda x: x['city_label'])
+        final_city_areas_data.sort(key=lambda x: x['city']['label_tr'])
 
-        return cities_for_dropdown, final_city_areas_data
+        return final_city_areas_data
 
     def get_property_options(self):
-        property_types = get_choices_as_list_of_dicts(PropertyAdvertisement.PROPERTY_TYPE_CHOICES)
+        property_types = get_bilingual_choices_as_list_of_dicts(
+            choices_tuple=PropertyAdvertisement.PROPERTY_TYPE_CHOICES,
+            tr_label_map=PROPERTY_TYPE_TR_LABELS_MAP
+        )
         room_types = get_choices_as_list_of_dicts(PropertyAdvertisement.ROOM_TYPE_CHOICES)
-        warming_types = get_choices_as_list_of_dicts(PropertyAdvertisement.WARMING_TYPE_CHOICES)
 
-        cities_for_dropdown, city_areas_data = self.load_location_data_from_json()
+        city_areas_data = self.load_location_data_from_json()
 
         return {
             "propertyTypes": property_types,
-            "cities": cities_for_dropdown,
             "cityAreas": city_areas_data,
             "roomTypes": room_types,
-
-            "warmingTypes": warming_types,
         }
 
     def get_car_options(self):
-        vehicle_types = get_choices_as_list_of_dicts(CarAdvertisement.VEHICLE_TYPE_CHOICES)
-        gear_types = get_choices_as_list_of_dicts(CarAdvertisement.GEAR_TYPE_CHOICES)
-        steering_types = get_choices_as_list_of_dicts(CarAdvertisement.STEERING_TYPE_CHOICES)
-        price_types = get_choices_as_list_of_dicts(CarAdvertisement.PRICE_TYPE_CHOICES)  # Currency
+        vehicle_types = get_bilingual_choices_as_list_of_dicts(
+            choices_tuple=CarAdvertisement.VEHICLE_TYPE_CHOICES,
+            tr_label_map=VEHICLE_TYPE_TR_LABELS_MAP
+        )
 
         predefined_brands_list = []
         for brand_name in PREDEFINED_CAR_DATA.keys():
@@ -652,30 +577,21 @@ class CombinedFilterOptionsView(APIView):
             })
         brand_series_structure.sort(key=lambda x: x['brand']['label'])
 
+        start_year = 2010
+        end_year = datetime.date.today().year
 
-        model_years_qs = CarAdvertisement.objects.values_list('model_year', flat=True).distinct().order_by(
-            '-model_year')
-        model_years = [{"value": str(year), "label": str(year)} for year in model_years_qs if year is not None]
-        if not model_years:
-            import datetime
-            current_year = datetime.date.today().year
-            model_years = [{"value": str(year), "label": str(year)} for year in
-                           range(current_year, current_year - 25, -1)]
-
-
-        all_db_models_qs = CarAdvertisement.objects.filter(model__isnull=False).exclude(model__exact='').values_list(
-            'model', flat=True).distinct().order_by('model')
-        all_db_models_for_dropdown = [{"value": m.lower(), "label": m} for m in all_db_models_qs]
-
+        model_years_for_dropdown = []
+        for year in range(end_year, start_year - 1, -1):
+            year_str = str(year)
+            model_years_for_dropdown.append({
+                "value": year_str,
+                "label": year_str
+            })
 
         return {
             "vehicleTypes": vehicle_types,
-            "brands": predefined_brands_list,
+            "modelYears": model_years_for_dropdown,
             "brandSeriesData": brand_series_structure,
-            "modelYears": model_years,
-            "gearTypes": gear_types,
-            "steeringTypes": steering_types,
-            "priceTypes": price_types,  # Currency
         }
 
     def get(self, request, *args, **kwargs):

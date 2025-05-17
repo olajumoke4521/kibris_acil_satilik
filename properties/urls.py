@@ -13,7 +13,6 @@ urlpatterns = [
          name='property-external-features-metadata'),
     path('features/interior/', views.PropertyInteriorFeaturesMetadataView.as_view(),
          name='property-interior-features-metadata'),
-    path('filter-options/', views.PropertyFilterOptionsView.as_view(), name='public-property-filter-options'),
 
     # Admin URLs
     path('admin/create-customer-and-property/', views.CreateCustomerAndPropertyView.as_view(), name='create_customer_and_ad'),

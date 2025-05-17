@@ -28,6 +28,14 @@ class CarAdvertisement(models.Model):
         ('cabrio', 'Cabrio'),
         ('minivan', 'Minivan'),
     ]
+    VEHICLE_TYPE_CHOICES_TR = [
+        ('sedan', 'Sedan'),
+        ('suv', 'SUV'),
+        ('hatchback', 'Hatchback'),
+        ('pickup', 'Toplama'),
+        ('cabrio', 'Cabrio'),
+        ('minivan', 'Minibüs'),
+    ]
     vehicle_type = models.CharField(max_length=50, choices=VEHICLE_TYPE_CHOICES)
     ADVERTISEMENT_TYPE_CHOICES = [
         ('sale', 'Sale'),
@@ -56,6 +64,7 @@ class CarAdvertisement(models.Model):
 
     brand = models.CharField(max_length=100, blank=True, null=True)
     model = models.CharField(max_length=100, blank=True, null=True)
+    series = models.CharField(max_length=100, blank=True, null=True)
     model_year = models.IntegerField()
     case_type = models.CharField(max_length=50, blank=True, null=True)
     fuel_type = models.CharField(max_length=50, blank=True, null=True)

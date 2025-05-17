@@ -1,5 +1,3 @@
-
-import uuid
 from django.db import models
 from django.core.validators import FileExtensionValidator
 from accounts.models import User, Customer
@@ -84,6 +82,7 @@ class PropertyAdvertisement(models.Model):
         ('abandoned_building', 'Abandoned Building'),
         ('half_construction', 'Half Construction'),
     ]
+
     property_type = models.CharField(max_length=50, choices=PROPERTY_TYPE_CHOICES)
     ADVERTISEMENT_TYPE_CHOICES = [
         ('sale', 'Sale'),
@@ -132,7 +131,6 @@ class PropertyImage(models.Model):
         ordering = ['-is_cover', 'uploaded_at']
 
     def save(self, *args, **kwargs):
-        # Ensure only one cover photo per property
         if self.is_cover:
             PropertyImage.objects.filter(property_ad=self.property_ad, is_cover=True).update(is_cover=False)
         super().save(*args, **kwargs)
