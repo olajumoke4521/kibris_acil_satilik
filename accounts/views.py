@@ -5,8 +5,8 @@ from django.db import IntegrityError
 from knox.models import AuthToken
 from knox.views import LoginView as KnoxLoginView
 from knox.auth import TokenAuthentication
-from .models import User, Customer, CustomerOffer, OfferImage
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, CustomerSerializer, CustomerOfferSerializer, CustomerOfferCreateSerializer
+from .models import User, CustomerOffer, OfferImage
+from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, CustomerOfferSerializer, CustomerOfferCreateSerializer
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from collections import OrderedDict
 from rest_framework.views import APIView
@@ -95,23 +95,6 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
         return Response(serializer.data)
 
 
-class CustomerViewSet(viewsets.ModelViewSet):
-    """Viewset for Customer objects"""
-    serializer_class = CustomerSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
-
-    def get_queryset(self):
-        """Return customers for the current user only"""
-        return Customer.objects.filter(user=self.request.user).order_by('-created_at')
-
-
-    def perform_create(self, serializer):
-        """Save the customer with the current user"""
-        serializer.save(user=self.request.user)
-
-
 class CustomerOfferViewSet(viewsets.ModelViewSet):
     """ViewSet for managing customer offers (admin only)"""
     serializer_class = CustomerOfferSerializer
@@ -186,7 +169,6 @@ class APIRootView(APIView):
             ('login', reverse('login', request=request, format=format)),
             ('logout', reverse('logout', request=request, format=format)),
             ('user-detail', reverse('user-detail', request=request, format=format)),
-            ('customers', reverse('customer-list', request=request, format=format)),
             ('public-offer-create', reverse('public-offer-create', request=request, format=format)),
             ('admin-offers', reverse('admin-offer-list', request=request, format=format)),
 

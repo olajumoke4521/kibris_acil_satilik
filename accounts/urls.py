@@ -3,10 +3,9 @@
 from django.urls import path, include
 from knox import views as knox_views
 from rest_framework.routers import DefaultRouter
-from .views import RegisterView, LoginView, UserDetailView, CustomerViewSet, CustomerOfferViewSet, PublicCustomerOfferCreateView
+from .views import RegisterView, LoginView, UserDetailView, CustomerOfferViewSet, PublicCustomerOfferCreateView
 
 router = DefaultRouter()
-router.register(r'customers', CustomerViewSet, basename='customer')
 router.register(r'admin/offers', CustomerOfferViewSet, basename='admin-offer')
 
 urlpatterns = [

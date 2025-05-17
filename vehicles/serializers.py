@@ -1,14 +1,9 @@
 
 from rest_framework import serializers
-from django.core.validators import validate_email
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from .models import (
     CarAdvertisement, CarImage, CarExplanation,
     CarExternalFeature, CarInternalFeature
 )
-from accounts.models import Customer
-from accounts.serializers import CustomerSerializer
-
 
 class CarImageSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
@@ -55,7 +50,7 @@ class CarListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'advertise_no', 'title', 'price', 'price_type',
             'location_display',
-            'brand', 'model', 'model_year', 'fuel_type', 'gear_type',
+            'brand', 'model', 'series', 'model_year', 'fuel_type', 'gear_type',
             'images', 'published_date',
         )
 
@@ -70,12 +65,11 @@ class CarListSerializer(serializers.ModelSerializer):
 
 class CarAdminListSerializer(CarListSerializer):
     """Serializer for ADMIN car listing view"""
-    customer_name = serializers.CharField(source='customer.name', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True, allow_null=True)
 
     class Meta(CarListSerializer.Meta):
         fields = CarListSerializer.Meta.fields + (
-            'advertise_status', 'customer_name', 'user_email', 'created_at'
+            'advertise_status', 'user_email', 'created_at'
         )
 
 
@@ -93,7 +87,6 @@ class CarDetailSerializer(serializers.ModelSerializer):
 
 class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
     """Serializer used by Admin for Creating and Updating Cars"""
-    customer = serializers.CharField(write_only=True, required=False, allow_blank=True)
     explanation = serializers.CharField(write_only=True, required=False, allow_blank=True)
     external_features = CarExternalFeatureSerializer(required=False, allow_null=True)
     internal_features = CarInternalFeatureSerializer(required=False, allow_null=True)
@@ -102,32 +95,15 @@ class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
         model = CarAdvertisement
         fields = [
             'title', 'price', 'price_type', 'province', 'district', 'neighborhood', 'address',
-            'brand', 'model', 'model_year', 'color', 'gear_type', 'customer',
+            'brand', 'model', 'model_year', 'color', 'gear_type', 'series',
             'fuel_type', 'steering_type', 'engine_displacement', 'engine_power',
              'advertise_status', 'explanation', 'external_features', 'internal_features',
         ]
 
         read_only_fields = ('user',)
 
-    def validate_customer(self, value):
-        if not value:
-            return None
-        try:
-            email = str(value).strip().lower()
-            validate_email(email)
-            customer_instance = Customer.objects.get(email=email)
-            return customer_instance
-        except ValidationError:
-            raise serializers.ValidationError("Invalid email format provided for customer.")
-        except ObjectDoesNotExist:
-            raise serializers.ValidationError(f"Customer with email '{value}' not found.")
-        except Exception as e:
-            raise serializers.ValidationError(f"Error validating customer: {str(e)}")
 
     def create(self, validated_data):
-        customer_instance = validated_data.get('customer')
-        if not customer_instance:
-            pass
         external_features_data = validated_data.pop('external_features', None)
         internal_features_data = validated_data.pop('internal_features', None)
         explanation_data = validated_data.pop('explanation', None)

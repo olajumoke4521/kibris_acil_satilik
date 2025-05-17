@@ -1,13 +1,8 @@
 from rest_framework import serializers
-from django.core.validators import validate_email
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from .models import (
     PropertyAdvertisement, PropertyImage, PropertyExplanation, Location,
     PropertyExternalFeature, PropertyInteriorFeature
 )
-from accounts.models import Customer
-from accounts.serializers import CustomerSerializer
-
 from vehicles.models import CarAdvertisement
 from vehicles.serializers import CarListSerializer
 
@@ -62,13 +57,11 @@ class PropertyListSerializer(serializers.ModelSerializer):
 
 
 class PropertyAdminListSerializer(PropertyListSerializer):
-     """Serializer for ADMIN listing view"""
-     customer_name = serializers.CharField(source='customer.name', read_only=True)
      user_email = serializers.CharField(source='user.email', read_only=True, allow_null=True)
 
      class Meta(PropertyListSerializer.Meta):
         fields = PropertyListSerializer.Meta.fields + (
-            'advertise_status', 'customer_name', 'user_email', 'created_at'
+            'advertise_status', 'user_email', 'created_at'
         )
 
 class PropertyDetailSerializer(serializers.ModelSerializer):
@@ -86,7 +79,6 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
 
 
 class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
-    customer = serializers.CharField(write_only=True, required=False, allow_blank=True)
     external_features = PropertyExternalFeatureSerializer(required=False, allow_null=True)
     interior_features = PropertyInteriorFeatureSerializer(required=False, allow_null=True)
     province = serializers.CharField(write_only=True, required=True, max_length=100)
@@ -99,26 +91,8 @@ class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
         exclude = ('id', 'created_at', 'updated_at', 'published_date', 'location')
         read_only_fields = ('user',)
 
-    def validate_customer(self, value):
-        if not value:
-            return None
-        try:
-            email = str(value).strip().lower()
-            validate_email(email)
-            
-            customer_instance = Customer.objects.get(email=email)
-            return customer_instance
-        except ValidationError:
-            raise serializers.ValidationError("Invalid email format provided for customer.")
-        except ObjectDoesNotExist:
-            raise serializers.ValidationError(f"Customer with email '{value}' not found.")
-        except Exception as e:
-            raise serializers.ValidationError(f"Error validating customer: {str(e)}")
-
     def create(self, validated_data):
-        customer_instance = validated_data.get('customer')
-        if not customer_instance:
-            pass
+
         external_features_data = validated_data.pop('external_features', None)
         interior_features_data = validated_data.pop('interior_features', None)
         explanation_data = validated_data.pop('explanation', None)

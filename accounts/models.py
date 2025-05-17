@@ -3,7 +3,6 @@ import uuid
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from django.core.validators import FileExtensionValidator
-from django.conf import settings
 
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -19,43 +18,6 @@ class User(AbstractUser):
     def __str__(self):
         return self.email
 
-
-class Customer(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name='customers')
-    name = models.CharField(max_length=100)
-    email = models.EmailField(max_length=255, unique=True)
-    photo = models.ImageField(upload_to='customer_photos/', blank=True, null=True,
-                              validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])])
-    mobile_number = models.CharField(max_length=20, unique=True)
-    mobile_number_2 = models.CharField(max_length=20, blank=True, null=True)
-    mobile_number_3 = models.CharField(max_length=20, blank=True, null=True)
-    telephone = models.CharField(max_length=20, blank=True, null=True)
-    telephone_2 = models.CharField(max_length=20, blank=True, null=True)
-    telephone_3 = models.CharField(max_length=20, blank=True, null=True)
-    fax = models.CharField(max_length=20, blank=True, null=True)
-
-    ADVERTISE_TYPE_CHOICES = [
-        ('sale', 'Sale'),
-        ('rent', 'Rent'),
-    ]
-    type_of_advertise = models.CharField(max_length=10, choices=ADVERTISE_TYPE_CHOICES, default='sale')
-
-    CUSTOMER_ROLE_CHOICES = [
-        ('active', 'Active'),
-        ('passive', 'Passive'),
-    ]
-    customer_role = models.CharField(max_length=10, choices=CUSTOMER_ROLE_CHOICES, default='active')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.name} - {self.type_of_advertise}"
-
-    def save(self, *args, **kwargs):
-        if self.email:
-            self.email = self.email.strip().lower()
-        super().save(*args, **kwargs)
 
 class CustomerOffer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

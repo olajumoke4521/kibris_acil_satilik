@@ -1,3 +1,8 @@
+import os
+from django.conf import settings
+
+LOCATION_JSON_FILE_PATH = os.path.join(settings.BASE_DIR,  'location.json')
+
 PREDEFINED_CAR_DATA = {
     "BMW": {
         "series": ["1 Series", "2 Series", "3 Series", "4 Series", "5 Series", "7 Series", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "Z4", "M Series"],

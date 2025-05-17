@@ -2,13 +2,12 @@ import uuid
 from django.db import models
 from django.conf import settings
 from django.core.validators import FileExtensionValidator
-from accounts.models import User, Customer
+from accounts.models import User
 
 
 class CarAdvertisement(models.Model):
     id = models.AutoField(primary_key=True)
     advertise_no = models.CharField(max_length=20, blank=True, null=True)
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='car_advertisements')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='car_advertisements')
     title = models.CharField(max_length=200)
     price = models.DecimalField(max_digits=12, decimal_places=2)

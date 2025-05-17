@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.validators import FileExtensionValidator
-from accounts.models import User, Customer
+from accounts.models import User
 from django.conf import settings
 
 class Location(models.Model):
@@ -22,7 +22,6 @@ class Location(models.Model):
 class PropertyAdvertisement(models.Model):
     id = models.AutoField(primary_key=True)
     advertise_no = models.CharField(max_length=20, blank=True, null=True)
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='property_advertisements')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='property_advertisements')
     location = models.ForeignKey(Location, on_delete=models.PROTECT, related_name='properties', null=True, blank=True)
 

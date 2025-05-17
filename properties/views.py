@@ -14,17 +14,14 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from knox.auth import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import PropertyAdvertisement, PropertyImage, Location, PropertyInteriorFeature, PropertyExternalFeature
-from accounts.models import Customer
 from .serializers import (
     PropertyAdminListSerializer, PropertyDetailSerializer, PropertyAdminCreateUpdateSerializer,
     PropertyListSerializer, PropertyImageSerializer, LatestAdvertisementSerializer
 )
-from accounts.serializers import CustomerSerializer
 from .filters import PropertyFilter
 from vehicles.models import CarAdvertisement
-from .constants import PREDEFINED_CAR_DATA, PROPERTY_TYPE_TR_LABELS_MAP, VEHICLE_TYPE_TR_LABELS_MAP
+from .constants import PREDEFINED_CAR_DATA, PROPERTY_TYPE_TR_LABELS_MAP, VEHICLE_TYPE_TR_LABELS_MAP, LOCATION_JSON_FILE_PATH
 
-LOCATION_JSON_FILE_PATH = os.path.join(settings.BASE_DIR,  'location.json')
 
 class PropertyAdminViewSet(viewsets.ModelViewSet):
     """
@@ -181,185 +178,6 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-class CreateCustomerAndPropertyView(APIView):
-    permission_classes = [permissions.IsAdminUser]
-    authentication_classes = [TokenAuthentication]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
-    def get_or_create_location(self, data):
-        province = data.get('province', None)
-        district = data.get('district', None)
-        neighborhood = data.get('neighborhood', None)
-
-        if not province: return None
-        district = district if district else None
-        neighborhood = neighborhood if neighborhood else None
-
-        location_obj, created = Location.objects.get_or_create(
-            province=province,
-            district=district,
-            neighborhood=neighborhood
-        )
-        return location_obj
-
-    @transaction.atomic
-    def post(self, request, *args, **kwargs):
-        raw_data = request.data
-        customer_instance = None
-        use_existing_customer = False
-        existing_customer_email = None
-
-
-        customer_data = {}
-        property_data = {}
-        customer_photo_file = None
-        property_image_files = request.FILES.getlist('images')
-
-        customer_field_keys = ['name', 'email', 'photo', 'mobile_number', 'mobile_number_2', 'mobile_number_3',
-                               'telephone', 'telephone_2',
-                               'telephone_3', 'fax', 'type_of_advertise', 'customer_role']
-        nested_property_keys = ['external_features', 'interior_features']
-        location_field_keys = ['province', 'district', 'neighborhood']
-
-        if 'customer' in raw_data and isinstance(raw_data['customer'], str) and raw_data['customer'].strip():
-            potential_email = raw_data['customer'].strip().lower()
-            try:
-                validate_email(potential_email)
-                existing_customer_email = potential_email
-                use_existing_customer = True
-            except ValidationError:
-                return Response({'customer': [
-                    f"Invalid email format provided in 'customer' field ('{potential_email}') when trying to specify an existing customer."]},
-                                status=status.HTTP_400_BAD_REQUEST)
-
-        for key, value in raw_data.items():
-            if key == 'customer' and use_existing_customer:
-                continue
-            if key == 'photo' and value:
-                if hasattr(value, 'content_type') and 'image' in value.content_type:
-                    customer_photo_file = value
-                continue
-            if key in customer_field_keys:
-                if not use_existing_customer:
-                    if key == 'email':
-                        customer_data[key] = str(value).strip().lower()
-                    else:
-                        customer_data[key] = value
-                continue
-
-            if key == 'images':
-                continue
-
-            if key in nested_property_keys and isinstance(value, str):
-                try:
-                    if key in ['external_features', 'interior_features']:
-                        property_data[key] = json.loads(value)
-                    else:
-                        property_data[key] = value
-                except json.JSONDecodeError:
-                    return Response({key: [f"Invalid JSON string provided for {key}."]},status=status.HTTP_400_BAD_REQUEST)
-
-            if key not in ['customer', 'photo', 'images'] + customer_field_keys + nested_property_keys:
-                property_data[key] = value
-        try:
-            if use_existing_customer:
-                if not existing_customer_email:
-                    return Response({"customer": ["Could not determine email for existing customer lookup."]},
-                                    status=status.HTTP_400_BAD_REQUEST)
-                try:
-                    customer_instance = Customer.objects.get(email=existing_customer_email)
-                    if customer_photo_file or any(
-                            k in customer_data for k in customer_field_keys if k != 'email'):
-                        print(
-                            "WARN: Other customer details (name, photo, etc.) were provided but ignored because the 'customer' field indicated using an existing customer.")
-                except ObjectDoesNotExist:
-                    return Response(
-                        {"customer": [f"Existing customer with email '{existing_customer_email}' not found."]},
-                        status=status.HTTP_404_NOT_FOUND)
-
-            else:
-                new_customer_email = customer_data.get('email')
-                if not new_customer_email:
-                    return Response({'email': ["The 'email' field is required when creating a new customer."]},
-                                    status=status.HTTP_400_BAD_REQUEST)
-                try:
-                    validate_email(new_customer_email)
-                except ValidationError as e:
-                    return Response(
-                        {'email': [f"Invalid email format for new customer: {new_customer_email}. Error: {e}"]},
-                        status=status.HTTP_400_BAD_REQUEST)
-
-                required_customer_fields = {'name', 'mobile_number'}
-                missing_fields = [
-                    field for field in required_customer_fields if not customer_data.get(field)
-                ]
-                if missing_fields:
-                    errors = {field: ["This field is required."] for field in missing_fields}
-                    return Response(errors, status=status.HTTP_400_BAD_REQUEST)
-
-                if Customer.objects.filter(email=new_customer_email).exists():
-                    raise ValidationError({'email': [
-                        f"A customer with this email ('{new_customer_email}') already exists. If you intend to use this customer, provide their email in the 'customer' field."]})
-
-                create_kwargs = {k: v for k, v in customer_data.items() if k != 'photo'}
-                create_kwargs.setdefault('user', request.user)
-
-                customer_instance = Customer.objects.create(**create_kwargs)
-                if customer_photo_file:
-                    customer_instance.photo = customer_photo_file
-                    customer_instance.save(update_fields=['photo'])
-
-        except IntegrityError as e:
-            return Response({"customer_error": f"Database error during customer processing: {str(e)}"},
-                            status=status.HTTP_400_BAD_REQUEST)
-        except ValidationError as e:
-            return Response({"customer_error": e.message_dict}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"customer_error": f"Unexpected error processing customer: {str(e)}"},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        if not customer_instance:
-            return Response({"error": "Customer instance could not be determined."},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-        location_instance = self.get_or_create_location(property_data)
-        if location_instance is None and request.data.get('province'):
-            return Response({"location_error": "Failed to get or create location based on provided province."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        property_serializer = PropertyAdminCreateUpdateSerializer(data=property_data, context={'request': request})
-
-        if not property_serializer.is_valid():
-            return Response({"property_errors": property_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            property_instance = property_serializer.save(
-                user=request.user,
-                customer=customer_instance,
-                location=location_instance
-            )
-        except ValidationError as e:
-            return Response({"property_errors": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"property_errors": f"Failed to save property advertisement: {str(e)}"},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        if property_image_files:
-            make_first_cover = not PropertyImage.objects.filter(property_ad=property_instance, is_cover=True).exists()
-            for i, image_file in enumerate(property_image_files):
-                try:
-                    PropertyImage.objects.create(
-                        property_ad=property_instance,
-                        image=image_file,
-                        is_cover=(i == 0 and make_first_cover)
-                    )
-                except Exception as e:
-                    print(f"Error saving property image {i}: {e}")
-                    return Response({"image_error": f"Failed to save property image {i + 1}: {str(e)}"},
-                                    status=status.HTTP_400_BAD_REQUEST)
-
-        detail_serializer = PropertyDetailSerializer(property_instance, context={'request': request})
-        return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
 
 class PublicPropertyListView(generics.ListAPIView):
     """View for listing ACTIVE properties publicly"""
@@ -384,7 +202,7 @@ class PublicPropertyDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         """Return active, published property advertisements"""
-        return PropertyAdvertisement.objects.filter(advertise_status='on').select_related('location', 'customer', 'user', 'explanation', 'external_features', 'interior_features').prefetch_related('images')
+        return PropertyAdvertisement.objects.filter(advertise_status='on').select_related('location', 'user', 'explanation', 'external_features', 'interior_features').prefetch_related('images')
 
 
 def get_feature_metadata(model_class):

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import Customer, CustomerOffer, User, OfferImage
+from .models import CustomerOffer, User, OfferImage
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -101,23 +101,6 @@ class LoginSerializer(serializers.Serializer):
         attrs['user'] = user
         return attrs
 
-
-class CustomerSerializer(serializers.ModelSerializer):
-    """Serializer for Customer objects"""
-    photo = serializers.ImageField(max_length=None, use_url=True, required=False, allow_null=True)
-    user_id = serializers.UUIDField(source='user.id', read_only=True)
-
-    user_email = serializers.EmailField(source='user.email', read_only=True)
-
-    class Meta:
-        model = Customer
-        fields = (
-            'id', 'user_id', 'user_email', 'name', 'email', 'photo', 'mobile_number',
-            'mobile_number_2', 'mobile_number_3', 'telephone',
-            'telephone_2', 'telephone_3', 'fax', 'type_of_advertise',
-            'customer_role', 'created_at', 'updated_at'
-        )
-        read_only_fields = ('id', 'user_id', 'user_email', 'created_at', 'updated_at')
 
 class OfferImageSerializer(serializers.ModelSerializer):
     """Serializer for OfferImage objects"""
