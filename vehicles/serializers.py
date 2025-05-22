@@ -90,6 +90,7 @@ class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
     explanation = serializers.CharField(write_only=True, required=False, allow_blank=True)
     external_features = CarExternalFeatureSerializer(required=False, allow_null=True)
     internal_features = CarInternalFeatureSerializer(required=False, allow_null=True)
+    is_active = serializers.BooleanField(required=False)
 
     class Meta:
         model = CarAdvertisement
@@ -97,7 +98,7 @@ class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
             'title', 'price', 'price_type', 'province', 'district', 'neighborhood', 'address',
             'brand', 'model', 'model_year', 'color', 'gear_type', 'series',
             'fuel_type', 'steering_type', 'engine_displacement', 'engine_power',
-             'advertise_status', 'explanation', 'external_features', 'internal_features',
+             'advertise_status', 'explanation', 'external_features', 'internal_features', 'is_active'
         ]
 
         read_only_fields = ('user',)

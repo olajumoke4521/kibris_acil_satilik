@@ -10,6 +10,7 @@ class CarAdvertisement(models.Model):
     advertise_no = models.CharField(max_length=20, blank=True, null=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='car_advertisements')
     title = models.CharField(max_length=200)
+    is_active = models.BooleanField(default=True)
     price = models.DecimalField(max_digits=12, decimal_places=2)
 
     PRICE_TYPE_CHOICES = [

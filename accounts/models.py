@@ -10,6 +10,7 @@ class User(AbstractUser):
     username = models.CharField(max_length=150, unique=True, blank=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     date_of_membership = models.DateTimeField(default=timezone.now, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
     photo = models.ImageField(upload_to='user_photos/', blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])])
 
     USERNAME_FIELD = 'email'
@@ -47,6 +48,7 @@ class CustomerOffer(models.Model):
     room_type = models.CharField(max_length=100, choices=ROOM_TYPE_CHOICES)
     price = models.DecimalField(max_digits=12, decimal_places=2)
     description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
 
     # Contact information

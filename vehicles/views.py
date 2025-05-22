@@ -30,6 +30,8 @@ class CarAdminViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'published_date', 'price', 'title', 'model_year', 'mileage']
     ordering = ['-created_at']
 
+    http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
+
     def get_serializer_class(self):
         if self.action == 'list':
             return CarAdminListSerializer
@@ -38,7 +40,7 @@ class CarAdminViewSet(viewsets.ModelViewSet):
         return CarDetailSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = CarAdvertisement.objects.filter(is_active=True).select_related('user', 'explanation', 'external_features', 'internal_features').prefetch_related('images')
         return queryset
 
     @transaction.atomic
@@ -125,7 +127,7 @@ class PublicCarListView(generics.ListAPIView):
     ordering = ['-published_date']
 
     def get_queryset(self):
-        return CarAdvertisement.objects.filter(advertise_status='on').prefetch_related('images').order_by('-published_date')
+        return CarAdvertisement.objects.filter(is_active=True).prefetch_related('images').order_by('-published_date')
 
 class PublicCarDetailView(generics.RetrieveAPIView):
     serializer_class = CarDetailSerializer
@@ -133,7 +135,7 @@ class PublicCarDetailView(generics.RetrieveAPIView):
     lookup_field = 'pk'
 
     def get_queryset(self):
-        return CarAdvertisement.objects.filter(advertise_status='on').select_related('user', 'explanation', 'external_features', 'internal_features').prefetch_related('images')
+        return CarAdvertisement.objects.filter(is_active=True).select_related('user', 'explanation', 'external_features', 'internal_features').prefetch_related('images')
 
 def get_feature_metadata(model_class):
     feature_list = []

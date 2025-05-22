@@ -27,6 +27,7 @@ class PropertyAdvertisement(models.Model):
 
     title = models.CharField(max_length=200)
     price = models.DecimalField(max_digits=15, decimal_places=2)
+    is_active = models.BooleanField(default=True)
 
     CURRENCY_TYPE_CHOICES = [
         ('USD', 'USD'),

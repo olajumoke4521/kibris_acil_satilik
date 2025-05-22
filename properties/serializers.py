@@ -85,6 +85,7 @@ class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
     district = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=100)
     neighborhood = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=100)
     explanation = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    is_active = serializers.BooleanField(required=False)
 
     class Meta:
         model = PropertyAdvertisement

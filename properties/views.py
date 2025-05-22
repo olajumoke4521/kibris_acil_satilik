@@ -24,10 +24,7 @@ from .constants import PREDEFINED_CAR_DATA, PROPERTY_TYPE_TR_LABELS_MAP, VEHICLE
 
 
 class PropertyAdminViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for Admin users to manage Property Advertisements.
-    Handles CRUD, image uploads, and feature updates.
-    """
+
     queryset = PropertyAdvertisement.objects.select_related(
         'location', 'user', 'explanation', 'external_features', 'interior_features'
     ).prefetch_related('images').all()
@@ -40,6 +37,8 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'published_date', 'price', 'title']
     ordering = ['-created_at']
 
+    http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
+
     def get_serializer_class(self):
         if self.action == 'list':
             return PropertyAdminListSerializer
@@ -48,7 +47,7 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
         return PropertyDetailSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = PropertyAdvertisement.objects.filter(is_active=True).select_related('location').prefetch_related('images').order_by('-published_date')
         return queryset
 
     def get_or_create_location(self, validated_data):
@@ -191,7 +190,7 @@ class PublicPropertyListView(generics.ListAPIView):
 
     def get_queryset(self):
         """Return active, published property advertisements"""
-        return PropertyAdvertisement.objects.filter(advertise_status='on').select_related('location').prefetch_related('images').order_by('-published_date')
+        return PropertyAdvertisement.objects.filter(is_active=True).select_related('location').prefetch_related('images').order_by('-published_date')
 
 
 class PublicPropertyDetailView(generics.RetrieveAPIView):
@@ -202,7 +201,7 @@ class PublicPropertyDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         """Return active, published property advertisements"""
-        return PropertyAdvertisement.objects.filter(advertise_status='on').select_related('location', 'user', 'explanation', 'external_features', 'interior_features').prefetch_related('images')
+        return PropertyAdvertisement.objects.filter(is_active=True).select_related('location', 'user', 'explanation', 'external_features', 'interior_features').prefetch_related('images')
 
 
 def get_feature_metadata(model_class):
