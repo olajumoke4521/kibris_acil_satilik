@@ -28,12 +28,12 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
     queryset = PropertyAdvertisement.objects.select_related(
         'location', 'user', 'explanation', 'external_features', 'interior_features'
     ).prefetch_related('images').all()
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = PropertyFilter
-    search_fields = ['title', 'advertise_no', 'explanation__explanation', 'location__city', 'location__district']
+    search_fields = ['title', 'advertise_no', 'explanation__explanation', 'location__city', 'location__area']
     ordering_fields = ['created_at', 'published_date', 'price', 'title']
     ordering = ['-created_at']
 
@@ -51,16 +51,14 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
         return queryset
 
     def get_or_create_location(self, validated_data):
-        province = validated_data.pop('province', None)
-        district = validated_data.pop('district', None)
-        neighborhood = validated_data.pop('neighborhood', None)
+        city = validated_data.pop('city', None)
+        area = validated_data.pop('area', None)
 
-        if not province: return None
+        if not city: return None
 
         location_obj, _ = Location.objects.get_or_create(
-            province=province,
-            district=district if district else None,
-            neighborhood=neighborhood if neighborhood else None
+            city=city,
+            area=area if area else None,
         )
         return location_obj
 
@@ -71,9 +69,8 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         location_obj = self.get_or_create_location({
-            'province': data.get('province'),
-            'district': data.get('district'),
-            'neighborhood': data.get('neighborhood')
+            'city': data.get('city'),
+            'area': data.get('area'),
         })
 
         instance = serializer.save(user=self.request.user, location=location_obj)
@@ -98,11 +95,10 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         data = request.data.copy()
 
-        if 'province' in data:
+        if 'city' in data:
             location_obj = self.get_or_create_location({
-                'province': data.get('province'),
-                'district': data.get('district'),
-                'neighborhood': data.get('neighborhood')
+                'city': data.get('city'),
+                'area': data.get('area'),
             })
 
             location = location_obj
@@ -184,7 +180,7 @@ class PublicPropertyListView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = PropertyFilter
-    search_fields = ['title', 'explanation__explanation', 'location__city', 'location__district']
+    search_fields = ['title', 'explanation__explanation', 'location__city', 'location__area']
     ordering_fields = ['published_date', 'price', 'title']
     ordering = ['-published_date']
 

@@ -1,4 +1,3 @@
-import uuid
 from django.db import models
 from django.conf import settings
 from django.core.validators import FileExtensionValidator
@@ -7,7 +6,6 @@ from accounts.models import User
 
 class CarAdvertisement(models.Model):
     id = models.AutoField(primary_key=True)
-    advertise_no = models.CharField(max_length=20, blank=True, null=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='car_advertisements')
     title = models.CharField(max_length=200)
     is_active = models.BooleanField(default=True)
@@ -42,9 +40,6 @@ class CarAdvertisement(models.Model):
         ('rent', 'Rent'),
     ]
     advertisement_type = models.CharField(max_length=50, choices=ADVERTISEMENT_TYPE_CHOICES)
-    province = models.CharField(max_length=100, blank=True, null=True)
-    neighborhood = models.CharField(max_length=100, blank=True, null=True)
-    district = models.CharField(max_length=100, blank=True, null=True)
     address = models.TextField()
 
     ADVERT_STATUS_CHOICES = [
@@ -63,19 +58,23 @@ class CarAdvertisement(models.Model):
     color = models.CharField(max_length=50)
 
     brand = models.CharField(max_length=100, blank=True, null=True)
-    model = models.CharField(max_length=100, blank=True, null=True)
     series = models.CharField(max_length=100, blank=True, null=True)
     model_year = models.IntegerField()
-    case_type = models.CharField(max_length=50, blank=True, null=True)
-    fuel_type = models.CharField(max_length=50, blank=True, null=True)
+    FUEL_TYPE_CHOICES = [
+        ('diesel', 'Diesel'),
+        ('gasoline', 'Gasoline'),
+        ('hybrid', 'Hybrid'),
+        ('electric', 'Electric'),
+    ]
+    fuel_type = models.CharField(max_length=50, choices=FUEL_TYPE_CHOICES, blank=True, null=True)
 
     STEERING_TYPE_CHOICES = [
         ('right_steering_wheel', 'Right Steering Wheel'),
         ('left_steering_wheel', 'Left Steering Wheel'),
     ]
     steering_type = models.CharField(max_length=20, choices=STEERING_TYPE_CHOICES)
-    engine_displacement = models.CharField(max_length=50, blank=True, null=True)
-    engine_power = models.CharField(max_length=50, blank=True, null=True)
+    engine_displacement = models.IntegerField(blank=True, null=True)
+    engine_power = models.IntegerField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

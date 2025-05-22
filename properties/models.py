@@ -5,28 +5,26 @@ from django.conf import settings
 
 class Location(models.Model):
     id = models.AutoField(primary_key=True)
-    province = models.CharField(max_length=100)
-    district = models.CharField(max_length=100, blank=True, null=True)
-    neighborhood = models.CharField(max_length=100, blank=True, null=True)
+    city = models.CharField(max_length=100)
+    area = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
-        unique_together = ('province', 'district', 'neighborhood')
-        ordering = ['province', 'district', 'neighborhood']
+        unique_together = ('city', 'area')
+        ordering = ['city', 'area']
         verbose_name = "Location"
         verbose_name_plural = "Locations"
 
     def __str__(self):
-        parts = [self.province, self.district, self.neighborhood]
+        parts = [self.city, self.area]
         return ' / '.join(part for part in parts if part)
 
 class PropertyAdvertisement(models.Model):
     id = models.AutoField(primary_key=True)
-    advertise_no = models.CharField(max_length=20, blank=True, null=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='property_advertisements')
     location = models.ForeignKey(Location, on_delete=models.PROTECT, related_name='properties', null=True, blank=True)
 
     title = models.CharField(max_length=200)
-    price = models.DecimalField(max_digits=15, decimal_places=2)
+    price = models.DecimalField(max_digits=20, decimal_places=2)
     is_active = models.BooleanField(default=True)
 
     CURRENCY_TYPE_CHOICES = [
@@ -35,7 +33,7 @@ class PropertyAdvertisement(models.Model):
         ('GBP', 'GBP'),
         ('TRY', 'TRY'),
     ]
-    price_type = models.CharField(max_length=3, choices=CURRENCY_TYPE_CHOICES, default='TRY')
+    price_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE_CHOICES, default='GBP')
     address = models.TextField()
 
     ADVERT_STATUS_CHOICES = [
@@ -89,10 +87,10 @@ class PropertyAdvertisement(models.Model):
         ('rent', 'Rent'),
     ]
     advertisement_type = models.CharField(max_length=50, choices=ADVERTISEMENT_TYPE_CHOICES)
-    gross_area = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    net_area = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    gross_area = models.DecimalField(max_digits=20, decimal_places=2, blank=True, null=True)
+    net_area = models.DecimalField(max_digits=20, decimal_places=2, blank=True, null=True)
     building_age = models.IntegerField(blank=True, null=True)
-    floor_location = models.CharField(max_length=20, blank=True, null=True)
+    floor_location = models.IntegerField(blank=True, null=True)
     housing_shape = models.CharField(max_length=20, blank=True, null=True)
 
     WARMING_TYPE_CHOICES = [
@@ -103,14 +101,13 @@ class PropertyAdvertisement(models.Model):
         ('no_heating', 'No Heating'),
     ]
     warming_type = models.CharField(max_length=15, choices=WARMING_TYPE_CHOICES, blank=True, null=True)
-    dues = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    dues_type = models.CharField(max_length=3, choices=CURRENCY_TYPE_CHOICES, default='TRY')
-    rental_income = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    rental_income_type = models.CharField(max_length=3, choices=CURRENCY_TYPE_CHOICES, default='TRY')
+    dues = models.DecimalField(max_digits=50, decimal_places=2, blank=True, null=True)
+    dues_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE_CHOICES, default='GBP')
+    rent = models.DecimalField(max_digits=50, decimal_places=2, blank=True, null=True)
+    rent_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE_CHOICES, default='GBP')
     available_for_loan = models.BooleanField(default=False)
     furnished = models.BooleanField(default=False)
     swap = models.BooleanField(default=False)
-    front = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

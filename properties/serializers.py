@@ -10,7 +10,7 @@ from vehicles.serializers import CarListSerializer
 class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
-        fields = ('id', 'province', 'district', 'neighborhood')
+        fields = ('id', 'city', 'area')
 
 class PropertyImageSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
@@ -53,7 +53,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyAdvertisement
-        fields = ('id','advertise_no', 'title', 'price', 'price_type', 'address', 'location_str', 'property_type', 'advertisement_type', 'room_type','gross_area', 'net_area', 'images', 'published_date')
+        fields = ('id', 'title', 'price', 'price_currency', 'address', 'location_str', 'property_type', 'advertisement_type', 'room_type','gross_area', 'net_area', 'images', 'published_date')
 
 
 class PropertyAdminListSerializer(PropertyListSerializer):
@@ -75,15 +75,14 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = PropertyAdvertisement
         fields = '__all__'
-        read_only_fields = ('id', 'user', 'advertise_no', 'created_at', 'updated_at', 'published_date')
+        read_only_fields = ('id', 'user', 'created_at', 'updated_at', 'published_date')
 
 
 class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
     external_features = PropertyExternalFeatureSerializer(required=False, allow_null=True)
     interior_features = PropertyInteriorFeatureSerializer(required=False, allow_null=True)
-    province = serializers.CharField(write_only=True, required=True, max_length=100)
-    district = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=100)
-    neighborhood = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=100)
+    city = serializers.CharField(write_only=True, required=True, max_length=100)
+    area = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=100)
     explanation = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     is_active = serializers.BooleanField(required=False)
 

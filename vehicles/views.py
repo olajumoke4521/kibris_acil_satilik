@@ -21,13 +21,13 @@ class CarAdminViewSet(viewsets.ModelViewSet):
     """ViewSet for Admin users to manage Car Advertisements."""
     queryset = CarAdvertisement.objects.select_related( 'user', 'explanation', 'external_features', 'internal_features'
     ).prefetch_related('images').all()
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     filterset_class = CarFilter
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['title', 'advertise_no', 'brand', 'model', 'explanation__explanation']
-    ordering_fields = ['created_at', 'published_date', 'price', 'title', 'model_year', 'mileage']
+    search_fields = ['title', 'brand', 'series', 'explanation__explanation']
+    ordering_fields = ['created_at', 'published_date', 'price', 'title', 'model_year']
     ordering = ['-created_at']
 
     http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
@@ -122,7 +122,7 @@ class PublicCarListView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = CarFilter
-    search_fields = ['title', 'brand', 'model', 'explanation__explanation']
+    search_fields = ['title', 'brand', 'series', 'explanation__explanation']
     ordering_fields = ['published_date', 'price', 'title', 'model_year']
     ordering = ['-published_date']
 

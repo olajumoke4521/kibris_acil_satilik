@@ -43,24 +43,14 @@ class CarInternalFeatureSerializer(serializers.ModelSerializer):
 class CarListSerializer(serializers.ModelSerializer):
     """Serializer for PUBLIC car listing view"""
     images = CarImageSerializer(many=True, read_only=True)
-    location_display = serializers.SerializerMethodField()
 
     class Meta:
         model = CarAdvertisement
         fields = (
-            'id', 'advertise_no', 'title', 'price', 'price_type',
-            'location_display',
-            'brand', 'model', 'series', 'model_year', 'fuel_type', 'gear_type',
+            'id', 'title', 'price', 'price_type',
+            'address', 'brand', 'series', 'model_year', 'fuel_type', 'gear_type',
             'images', 'published_date', 'is_active',
         )
-
-
-    def get_location_display(self, obj):
-        parts = [obj.province]
-
-        if obj.address:
-             parts.append(obj.address[:30] + "...")
-        return ' / '.join(part for part in parts if part)
 
 
 class CarAdminListSerializer(CarListSerializer):
@@ -95,8 +85,8 @@ class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CarAdvertisement
         fields = [
-            'title', 'price', 'price_type', 'province', 'district', 'neighborhood', 'address',
-            'brand', 'model', 'model_year', 'color', 'gear_type', 'series',
+            'title', 'price', 'price_type', 'address',
+            'brand', 'model_year', 'color', 'gear_type', 'series',
             'fuel_type', 'steering_type', 'engine_displacement', 'engine_power',
              'advertise_status', 'explanation', 'external_features', 'internal_features', 'is_active'
         ]
