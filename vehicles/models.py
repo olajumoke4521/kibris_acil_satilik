@@ -19,7 +19,7 @@ class CarAdvertisement(models.Model):
         ('GBP', 'GBP'),
         ('TRY', 'TRY'),
     ]
-    price_type = models.CharField(max_length=3, choices=PRICE_TYPE_CHOICES, default='TRY')
+    price_type = models.CharField(max_length=3, choices=PRICE_TYPE_CHOICES, default='GBP')
     VEHICLE_TYPE_CHOICES = [
         ('sedan', 'Sedan'),
         ('suv', 'SUV'),

@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import CustomerOffer, User, OfferImage
+from .models import CustomerOffer, OfferImage
+from django.contrib.auth import get_user_model
 
-
+User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User objects"""
     photo = serializers.ImageField(max_length=None, use_url=True, required=False, allow_null=True)
@@ -11,8 +12,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'phone', 'date_of_membership', 'photo', 'is_staff', 'is_superuser', 'password', 'password_confirm')
-        read_only_fields = ('id', 'date_of_membership', 'is_staff', 'is_superuser')
+        fields = ('id', 'email', 'phone', 'date_of_membership', 'photo',  'password', 'password_confirm')
+        read_only_fields = ('id', 'date_of_membership')
 
     def validate(self, attrs):
         password = attrs.get('password')
@@ -48,7 +49,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'username', 'password', 'password_confirm', 'phone', 'photo')
+        fields = ('email', 'password', 'password_confirm', 'phone', 'photo')
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
@@ -66,7 +67,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"email": "Email is required."})
 
         user = User.objects.create_user(
-            username=email,
             email=email,
             password=password,
             **validated_data
