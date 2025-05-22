@@ -52,15 +52,6 @@ class CustomerOffer(models.Model):
     # Contact information
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
-
-    # Type of offer (property or vehicle)
-    # OFFER_TYPE_CHOICES = [
-    #    ('property', 'Property'),
-    #    ('vehicle', 'Vehicle'),
-    #]
-    #offer_type = models.CharField(max_length=10, choices=OFFER_TYPE_CHOICES, default='property')
-
-    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

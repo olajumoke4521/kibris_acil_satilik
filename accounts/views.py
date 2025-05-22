@@ -16,18 +16,11 @@ from rest_framework.permissions import AllowAny
 
 
 class RegisterView(generics.CreateAPIView):
-    """View for user registration - only allows one user to be created"""
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def create(self, request, *args, **kwargs):
-        if User.objects.exists():
-            return Response(
-                {"detail": "Registration is closed. A user already exists."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         try:
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -42,7 +35,7 @@ class RegisterView(generics.CreateAPIView):
             response_data = {
                 "user": UserSerializer(user, context=self.get_serializer_context()).data,
                 "token": token,
-                "message": "Admin User registered successfully"
+                "message": "User registered successfully"
             }
 
             return Response(response_data, status=status.HTTP_201_CREATED)
