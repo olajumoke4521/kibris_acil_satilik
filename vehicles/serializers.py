@@ -51,7 +51,7 @@ class CarListSerializer(serializers.ModelSerializer):
             'id', 'advertise_no', 'title', 'price', 'price_type',
             'location_display',
             'brand', 'model', 'series', 'model_year', 'fuel_type', 'gear_type',
-            'images', 'published_date',
+            'images', 'published_date', 'is_active',
         )
 
 
