@@ -241,7 +241,7 @@ class LatestAdvertisementsView(APIView):
 
     def get(self, request, *args, **kwargs):
         latest_properties_qs = PropertyAdvertisement.objects.filter(
-            advertise_status='on'
+            is_active=True
         ).select_related(
             'location'
         ).prefetch_related(
@@ -249,7 +249,7 @@ class LatestAdvertisementsView(APIView):
         ).order_by('-published_date')[:self.AD_COUNT_LIMIT]
 
         latest_cars_qs = CarAdvertisement.objects.filter(
-            advertise_status='on'
+            is_active=True
         ).prefetch_related(
             'images'
         ).order_by('-published_date')[:self.AD_COUNT_LIMIT]
