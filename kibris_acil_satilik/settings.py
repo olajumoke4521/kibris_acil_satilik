@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from rest_framework.settings import api_settings
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -125,11 +126,22 @@ REST_FRAMEWORK = {
 }
 
 # Knox authentication settings
+KNOX_TOKEN_MODEL = 'knox.AuthToken'
+
 REST_KNOX = {
-    'TOKEN_TTL': timedelta(days=7),
-    'AUTO_REFRESH': True,
-    'USER_SERIALIZER': 'accounts.serializers.UserSerializer',
+  'SECURE_HASH_ALGORITHM': 'cryptography.hazmat.primitives.hashes.SHA512',
+  'AUTH_TOKEN_CHARACTER_LENGTH': 64,
+  'TOKEN_TTL': timedelta(days=10),
+  'USER_SERIALIZER': 'accounts.serializers.UserSerializer',
+  'TOKEN_LIMIT_PER_USER': None,
+  'AUTO_REFRESH': False,
+  'AUTO_REFRESH_MAX_TTL': None,
+  'MIN_REFRESH_INTERVAL': 60,
+  'AUTH_HEADER_PREFIX': 'Token',
+  'EXPIRY_DATETIME_FORMAT': api_settings.DATETIME_FORMAT,
+  'TOKEN_MODEL': 'knox.AuthToken',
 }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators

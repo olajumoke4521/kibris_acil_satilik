@@ -119,7 +119,7 @@ class CarAdminViewSet(viewsets.ModelViewSet):
 
 class PublicCarListView(generics.ListAPIView):
     serializer_class = CarListSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = CarFilter
     search_fields = ['title', 'brand', 'series', 'explanation__explanation']
@@ -131,7 +131,7 @@ class PublicCarListView(generics.ListAPIView):
 
 class PublicCarDetailView(generics.RetrieveAPIView):
     serializer_class = CarDetailSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'pk'
 
     def get_queryset(self):

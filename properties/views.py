@@ -177,7 +177,7 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
 class PublicPropertyListView(generics.ListAPIView):
     """View for listing ACTIVE properties publicly"""
     serializer_class = PropertyListSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = PropertyFilter
     search_fields = ['title', 'explanation__explanation', 'location__city', 'location__area']
@@ -192,7 +192,7 @@ class PublicPropertyListView(generics.ListAPIView):
 class PublicPropertyDetailView(generics.RetrieveAPIView):
     """View for retrieving ACTIVE property details publicly"""
     serializer_class = PropertyDetailSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'pk'
 
     def get_queryset(self):
@@ -232,7 +232,7 @@ class PropertyInteriorFeaturesMetadataView(APIView):
         return Response(interior_features)
 
 class LatestAdvertisementsView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     AD_COUNT_LIMIT =6
 
     def get(self, request, *args, **kwargs):
@@ -291,7 +291,7 @@ def get_bilingual_choices_as_list_of_dicts(choices_tuple, tr_label_map=None, en_
     return bilingual_list
 
 class CombinedFilterOptionsView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def load_location_data_from_json(self):
         try:

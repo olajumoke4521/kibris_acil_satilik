@@ -91,7 +91,7 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
 
 class PublicOfferCreateView(generics.CreateAPIView):
     serializer_class = UserOfferCreateSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def perform_create(self, serializer):
