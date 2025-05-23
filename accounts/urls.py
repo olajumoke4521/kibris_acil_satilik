@@ -3,10 +3,12 @@
 from django.urls import path, include
 from knox import views as knox_views
 from rest_framework.routers import DefaultRouter
-from .views import RegisterView, LoginView, UserDetailView, CustomerOfferViewSet, PublicCustomerOfferCreateView
+from .views import RegisterView, LoginView, UserDetailView, PublicOfferCreateView, OfferAdminViewSet, \
+    OfferResponseAdminViewSet
 
 router = DefaultRouter()
-router.register(r'admin/offers', CustomerOfferViewSet, basename='admin-offer')
+router.register(r'admin/offers', OfferAdminViewSet, basename='admin-offer')
+router.register(r'admin/offer-responses', OfferResponseAdminViewSet, basename='admin-offer-response')
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
@@ -16,7 +18,7 @@ urlpatterns = [
     path('user/', UserDetailView.as_view(), name='user-detail'),
 
     # Public endpoint for creating offers
-    path('offers/submit/', PublicCustomerOfferCreateView.as_view(), name='public-offer-create'),
+    path('offers/submit/', PublicOfferCreateView.as_view(), name='public-offer-submit'),
 
     path('', include(router.urls)),
 

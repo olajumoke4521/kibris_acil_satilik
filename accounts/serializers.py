@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import CustomerOffer, OfferImage
+from .models import OfferImage, Offer, OfferResponse
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -117,38 +117,54 @@ class OfferImageSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(obj.image.url)
         return None
 
-class CustomerOfferSerializer(serializers.ModelSerializer):
-    """Serializer for CustomerOffer objects"""
-    images = OfferImageSerializer(many=True, read_only=True)
-
+class UserOfferCreateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CustomerOffer
-        fields = (
-            'id', 'name', 'address', 'unit_number', 'city', 'state',
-            'room_type', 'price', 'description', 'email', 'phone',
-            'status', 'images', 'created_at', 'updated_at'
-        )
-        read_only_fields = ('id', 'created_at', 'updated_at', 'images')
-
-
-class CustomerOfferCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating CustomerOffer objects (Public)"""
-
-    class Meta:
-        model = CustomerOffer
-        fields = (
-            'name', 'address', 'unit_number', 'city', 'state',
-            'room_type', 'price', 'description', 'email', 'phone',
-        )
-
+        model = Offer
+        fields = [
+            'full_name', 'email', 'phone', 'offer_type', 'details',
+            'model_name', 'kilometers', 'model_year',
+            'address', 'build_date', 'square_meters', 'room_type',
+        ]
 
     def validate(self, attrs):
-        """Ensure at least email or phone is provided"""
+        offer_type = attrs.get('offer_type')
         email = attrs.get('email')
         phone = attrs.get('phone')
-
         if not email and not phone:
-            raise serializers.ValidationError(
-                "Please provide either an email address or a phone number so we can contact you."
-            )
+            raise serializers.ValidationError("Please provide either an email or phone number.")
+        if offer_type == 'property':
+            required_property_fields = ['build_date', 'square_meters', 'room_type']
+            for field in required_property_fields:
+                if not attrs.get(field):
+                    raise serializers.ValidationError(
+                        f"{field.replace('_', ' ').title()} is required for property offers."
+                    )
+
+        elif offer_type == 'car':
+            required_car_fields = ['model_name', 'kilometers', 'model_year']
+            for field in required_car_fields:
+                if not attrs.get(field):
+                    raise serializers.ValidationError(
+                        f"{field.replace('_', ' ').title()} is required for car offers."
+                    )
+
         return attrs
+
+
+class OfferResponseSerializer(serializers.ModelSerializer):
+    user_offer = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = OfferResponse
+        fields = ('id', 'user_offer', 'offer_price', 'offer_description', 'offer_date', 'created_at', 'admin_user')
+        read_only_fields = ('id', 'created_at', 'offer_date', 'admin_user')
+
+class UserOfferAdminSerializer(serializers.ModelSerializer):
+    images = OfferImageSerializer(many=True, read_only=True)
+    admin_responses = OfferResponseSerializer(many=True, read_only=True) # Show nested responses
+    offer_type_display = serializers.CharField(source='get_offer_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Offer
+        fields = '__all__'
