@@ -95,7 +95,7 @@ class PublicOfferCreateView(generics.CreateAPIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def perform_create(self, serializer):
-        offer = serializer.save(status='awaiting_admin_response') # Update status
+        offer = serializer.save()
         images_data = self.request.FILES.getlist('images')
         for image_file in images_data:
             OfferImage.objects.create(offer_request=offer, image=image_file)
