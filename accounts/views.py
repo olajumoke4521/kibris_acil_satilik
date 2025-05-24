@@ -1,4 +1,5 @@
-from rest_framework import generics, permissions, status, viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import generics, permissions, status, viewsets, filters as drf_filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import login
@@ -9,8 +10,10 @@ from knox.auth import TokenAuthentication
 
 from properties.models import PropertyAdvertisement
 from vehicles.models import CarAdvertisement
+from .filters import OfferFilter
 from .models import User, OfferImage, Offer, OfferResponse
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, OfferResponseSerializer, UserOfferAdminSerializer, UserOfferCreateSerializer
+from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, OfferResponseSerializer, \
+    UserOfferAdminSerializer, UserOfferCreateSerializer, OfferImageSerializer
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from collections import OrderedDict
 from rest_framework.views import APIView
@@ -98,6 +101,15 @@ class OfferAdminViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication]
 
+    filter_backends = [DjangoFilterBackend, drf_filters.SearchFilter, drf_filters.OrderingFilter]
+    filterset_class = OfferFilter
+
+    search_fields = [
+        'full_name', 'email', 'phone', 'details', 'city', 'area', 'id',
+        'car_details__model', 'car_details__brand',
+        'property_details__address'
+    ]
+    ordering_fields = ['created_at', 'price', 'city', 'offer_type']
     def get_queryset(self):
         return Offer.objects.select_related(
             'car_details',
@@ -106,7 +118,7 @@ class OfferAdminViewSet(viewsets.ModelViewSet):
             'images',
             'responses__created_by',
             'responses__offered_by'
-        ).all().order_by('-created_at')
+        ).filter(is_active=True).all().order_by('-created_at')
 
     @action(detail=True, methods=['post'], serializer_class=OfferResponseSerializer, url_path='respond')
     def create_admin_response(self, request, pk=None):
@@ -124,9 +136,26 @@ class OfferAdminViewSet(viewsets.ModelViewSet):
         serializer = OfferResponseSerializer(responses, many=True, context={'request': request})
         return Response(serializer.data)
 
+    @action(detail=True, methods=['patch'], url_path='images/(?P<image_pk>[^/.]+)/update',
+            serializer_class=OfferImageSerializer)
+    def update_offer_image_flags(self, request, pk=None, image_pk=None):
+        offer = self.get_object()
+        try:
+            offer_image = OfferImage.objects.get(pk=image_pk, offer=offer)
+        except OfferImage.DoesNotExist:
+            return Response({"error": "Image not found for this offer."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = OfferImageSerializer(offer_image, data=request.data, partial=True,
+                                                context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            full_image_serializer = OfferImageSerializer(offer_image, context={'request': request})
+            return Response(full_image_serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class OfferResponseAdminViewSet(viewsets.ModelViewSet):
-    queryset = OfferResponse.objects.select_related('offer', 'created_by', 'offered_by').all()
+    queryset = OfferResponse.objects.select_related('offer', 'created_by', 'offered_by').filter(is_active=True).all()
     serializer_class = OfferResponseSerializer
     permission_classes = [permissions.IsAdminUser]
 

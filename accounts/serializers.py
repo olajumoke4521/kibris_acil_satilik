@@ -234,8 +234,8 @@ class UserOfferAdminSerializer(serializers.ModelSerializer):
     images = OfferImageSerializer(many=True, read_only=True)
     responses = OfferResponseSerializer(many=True, read_only=True)
 
-    car_details = CarOfferDetailsSerializer(read_only=True, required=False)
-    property_details = PropertyOfferDetailsSerializer(read_only=True, required=False)
+    car_details = CarOfferDetailsSerializer(required=False, allow_null=True)
+    property_details = PropertyOfferDetailsSerializer(required=False, allow_null=True)
 
     class Meta:
         model = Offer
@@ -248,6 +248,28 @@ class UserOfferAdminSerializer(serializers.ModelSerializer):
             'property_details',
             'responses'
         ]
+
+    def update(self, instance, validated_data):
+        car_data = validated_data.pop('car_details', None)
+        property_data = validated_data.pop('property_details', None)
+
+        instance = super().update(instance, validated_data)
+
+        if instance.offer_type == 'car' and car_data is not None:
+            car_offer_instance, created = CarOffer.objects.update_or_create(
+                offer=instance, defaults=car_data
+            )
+        elif instance.offer_type != 'car' and hasattr(instance, 'car_details'):
+            instance.car_details.delete()
+
+        if instance.offer_type == 'property' and property_data is not None:
+            property_offer_instance, created = PropertyOffer.objects.update_or_create(
+                offer=instance, defaults=property_data
+            )
+        elif instance.offer_type != 'property' and hasattr(instance, 'property_details'):
+            instance.property_details.delete()
+
+        return instance
 
     def to_representation(self, instance):
         """

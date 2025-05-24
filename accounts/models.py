@@ -159,8 +159,13 @@ class OfferImage(models.Model):
         validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])]
     )
     is_cover_image = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)  #
+    is_active = models.BooleanField(default=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.is_cover_image:
+            OfferImage.objects.filter(offer=self.offer).exclude(pk=self.pk).update(is_cover_image=False)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Image for Offer {self.offer.id} ({self.image.name.split('/')[-1]})"
