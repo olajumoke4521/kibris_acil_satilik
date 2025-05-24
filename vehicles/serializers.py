@@ -40,6 +40,24 @@ class CarInternalFeatureSerializer(serializers.ModelSerializer):
         model = CarInternalFeature
         exclude = ('id', 'car_ad')
 
+class CarBasicSerializer(serializers.ModelSerializer):
+    cover_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CarAdvertisement
+        fields = ('id', 'title', 'price', 'published_date', 'is_active', 'cover_image')
+
+    def get_cover_image(self, obj):
+        cover_image_instance = obj.images.filter(is_cover=True).first()
+        if not cover_image_instance:
+            cover_image_instance = obj.images.first()
+
+        if cover_image_instance:
+            request = self.context.get('request')
+            image_serializer_data = CarImageSerializer(cover_image_instance, context={'request': request}).data
+            return image_serializer_data.get('image_url')
+        return None
+
 class CarListSerializer(serializers.ModelSerializer):
     """Serializer for PUBLIC car listing view"""
     images = CarImageSerializer(many=True, read_only=True)

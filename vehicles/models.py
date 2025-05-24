@@ -2,7 +2,21 @@ from django.db import models
 from django.conf import settings
 from django.core.validators import FileExtensionValidator
 from accounts.models import User
+from properties.constants import PREDEFINED_CAR_DATA
 
+# --- Helper function to generate choices ---
+def generate_brand_choices(car_data):
+    return sorted([(brand.lower().replace(" ", "-"), brand) for brand in car_data.keys()])
+
+def generate_series_choices(car_data):
+    all_series = set()
+    for brand_details in car_data.values():
+        for series_name in brand_details.get("series", []):
+            all_series.add(series_name)
+    return sorted([(series.lower().replace(" ", "-"), series) for series in all_series])
+
+BRAND_CHOICES = generate_brand_choices(PREDEFINED_CAR_DATA)
+SERIES_CHOICES = generate_series_choices(PREDEFINED_CAR_DATA)
 
 class CarAdvertisement(models.Model):
     id = models.AutoField(primary_key=True)
@@ -19,60 +33,76 @@ class CarAdvertisement(models.Model):
     ]
     price_type = models.CharField(max_length=3, choices=PRICE_TYPE_CHOICES, default='GBP')
     VEHICLE_TYPE_CHOICES = [
-        ('sedan', 'Sedan'),
-        ('suv', 'SUV'),
-        ('hatchback', 'Hatchback'),
-        ('pickup', 'Pickup'),
-        ('cabrio', 'Cabrio'),
-        ('minivan', 'Minivan'),
+        ('sedan', 'Sedan'), ('suv', 'SUV'), ('hatchback', 'Hatchback'),
+        ('pickup', 'Pickup'), ('cabrio', 'Cabrio'), ('minivan', 'Minivan'),
     ]
     VEHICLE_TYPE_CHOICES_TR = [
-        ('sedan', 'Sedan'),
-        ('suv', 'SUV'),
-        ('hatchback', 'Hatchback'),
-        ('pickup', 'Toplama'),
-        ('cabrio', 'Cabrio'),
-        ('minivan', 'Minibüs'),
+        ('sedan', 'Sedan'), ('suv', 'SUV'), ('hatchback', 'Heçbek'),
+        ('pickup', 'Pikap'), ('cabrio', 'Kabriyo'), ('minivan', 'Minivan'),
     ]
     vehicle_type = models.CharField(max_length=50, choices=VEHICLE_TYPE_CHOICES)
     ADVERTISEMENT_TYPE_CHOICES = [
-        ('sale', 'Sale'),
-        ('rent', 'Rent'),
+        ('sale', 'For Sale'),
+        ('rent', 'For Rent'),
+    ]
+    ADVERTISEMENT_TYPE_CHOICES_TR = [
+        ('sale', 'Satılık'),
+        ('rent', 'Kiralık'),
     ]
     advertisement_type = models.CharField(max_length=50, choices=ADVERTISEMENT_TYPE_CHOICES)
     address = models.TextField()
 
     ADVERT_STATUS_CHOICES = [
-        ('on', 'ON'),
-        ('off', 'OFF'),
+        ('on', 'On'), ('off', 'Off'),
+    ]
+    ADVERT_STATUS_CHOICES_TR = [
+        ('on', 'Yayında'),
+        ('off', 'Yayında Değil'),
     ]
     advertise_status = models.CharField(max_length=10, choices=ADVERT_STATUS_CHOICES, default='on')
     published_date = models.DateTimeField(auto_now_add=True)
 
     GEAR_TYPE_CHOICES = [
-        ('automatic', 'Automatic'),
-        ('manual', 'Manual'),
-        ('semi-automatic', 'Semi-Automatic'),
+        ('automatic', 'Automatic'), ('manual', 'Manual'), ('semi-automatic', 'Semi-Automatic'),
+    ]
+    GEAR_TYPE_CHOICES_TR = [
+        ('automatic', 'Otomatik'), ('manual', 'Manuel'), ('semi-automatic', 'Yarı Otomatik'),
     ]
     gear_type = models.CharField(max_length=15, choices=GEAR_TYPE_CHOICES)
     color = models.CharField(max_length=50)
 
-    brand = models.CharField(max_length=100, blank=True, null=True)
-    series = models.CharField(max_length=100, blank=True, null=True)
+    brand = models.CharField(
+        max_length=100,
+        choices=BRAND_CHOICES,
+        blank=True,
+        null=True
+    )
+    series = models.CharField(
+        max_length=100,
+        choices=SERIES_CHOICES,
+        blank=True,
+        null=True
+    )
     model_year = models.IntegerField()
     FUEL_TYPE_CHOICES = [
-        ('diesel', 'Diesel'),
-        ('gasoline', 'Gasoline'),
-        ('hybrid', 'Hybrid'),
-        ('electric', 'Electric'),
+        ('diesel', 'Diesel'), ('gasoline', 'Gasoline'), ('lpg', 'LPG'),
+        ('hybrid', 'Hybrid'), ('electric', 'Electric'),
+    ]
+    FUEL_TYPE_CHOICES_TR = [
+        ('diesel', 'Dizel'), ('gasoline', 'Benzin'), ('lpg', 'LPG'),
+        ('hybrid', 'Hibrit'), ('electric', 'Elektrikli'),
     ]
     fuel_type = models.CharField(max_length=50, choices=FUEL_TYPE_CHOICES, blank=True, null=True)
 
     STEERING_TYPE_CHOICES = [
-        ('right_steering_wheel', 'Right Steering Wheel'),
-        ('left_steering_wheel', 'Left Steering Wheel'),
+        ('right_steering_wheel', 'Right-Hand Drive'),
+        ('left_steering_wheel', 'Left-Hand Drive'),
     ]
-    steering_type = models.CharField(max_length=20, choices=STEERING_TYPE_CHOICES)
+    STEERING_TYPE_CHOICES_TR = [
+        ('right_steering_wheel', 'Sağ Direksiyon'),
+        ('left_steering_wheel', 'Sol Direksiyon'),
+    ]
+    steering_type = models.CharField(max_length=50, choices=STEERING_TYPE_CHOICES)
     engine_displacement = models.IntegerField(blank=True, null=True)
     engine_power = models.IntegerField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

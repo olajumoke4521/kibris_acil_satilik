@@ -6,6 +6,9 @@ from django.db import IntegrityError
 from knox.models import AuthToken
 from knox.views import LoginView as KnoxLoginView
 from knox.auth import TokenAuthentication
+
+from properties.models import PropertyAdvertisement
+from vehicles.models import CarAdvertisement
 from .models import User, OfferImage, Offer, OfferResponse
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, OfferResponseSerializer, UserOfferAdminSerializer, UserOfferCreateSerializer
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -89,69 +92,81 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
         return Response(serializer.data)
 
 
+# --- Admin ViewSet for Managing Offers ---
+class OfferAdminViewSet(viewsets.ModelViewSet):
+    serializer_class = UserOfferAdminSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+
+    def get_queryset(self):
+        return Offer.objects.select_related(
+            'car_details',
+            'property_details'
+        ).prefetch_related(
+            'images',
+            'responses__created_by',
+            'responses__offered_by'
+        ).all().order_by('-created_at')
+
+    @action(detail=True, methods=['post'], serializer_class=OfferResponseSerializer, url_path='respond')
+    def create_admin_response(self, request, pk=None):
+        offer_instance = self.get_object()
+        serializer = OfferResponseSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(offer=offer_instance, created_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'], serializer_class=OfferResponseSerializer, url_path='responses')
+    def list_admin_responses(self, request, pk=None):
+        offer = self.get_object()
+        responses = offer.responses.all().select_related('created_by', 'offered_by')
+        serializer = OfferResponseSerializer(responses, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+class OfferResponseAdminViewSet(viewsets.ModelViewSet):
+    queryset = OfferResponse.objects.select_related('offer', 'created_by', 'offered_by').all()
+    serializer_class = OfferResponseSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by_user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save()
+
 class PublicOfferCreateView(generics.CreateAPIView):
     serializer_class = UserOfferCreateSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
-    def perform_create(self, serializer):
-        offer = serializer.save()
-        images_data = self.request.FILES.getlist('images')
-        for image_file in images_data:
-            OfferImage.objects.create(offer_request=offer, image=image_file)
-        return offer
-
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
         return Response(
-            {"message": "Your offer request has been submitted. We will review it and contact you."},
-            status=status.HTTP_201_CREATED
+            {"message": "Your offer request has been submitted. We will review it and contact you.", "data": serializer.data},
+            status=status.HTTP_201_CREATED,
+            headers=headers
         )
 
-class OfferAdminViewSet(viewsets.ModelViewSet):
-    serializer_class = UserOfferAdminSerializer
+class DashboardTotalsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication]
-    queryset = Offer.objects.prefetch_related('images', 'admin_responses').all()
-    http_method_names = ['get', 'put', 'patch', 'head', 'options', 'post']
 
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['full_name', 'email', 'phone', 'details']
-    ordering_fields = ['created_at',  'offer_type']
-    ordering = ['-created_at']
+    def get(self, request, format=None):
+        total_cars = CarAdvertisement.objects.filter(is_active=True).count()
+        total_properties = PropertyAdvertisement.objects.filter(is_active=True).count()
+        total_offers = Offer.objects.filter(is_active=True).count()
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-
-        return queryset
-
-    @action(detail=True, methods=['post'], serializer_class=OfferResponseSerializer, url_path='respond')
-    def create_admin_response(self, request, pk=None):
-        user_offer_instance = self.get_object()
-        serializer = OfferResponseSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(user_offer=user_offer_instance, admin_user=request.user)
-            serializer.save(user_offer=user_offer_instance)
-            user_offer_instance.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-    @action(detail=True, methods=['get'], serializer_class=OfferResponseSerializer, url_path='responses')
-    def list_admin_responses(self, request, pk=None):
-        user_offer = self.get_object()
-        responses = user_offer.admin_responses.all()
-        serializer = OfferResponseSerializer(responses, many=True)
-        return Response(serializer.data)
-
-class OfferResponseAdminViewSet(viewsets.ModelViewSet):
-    serializer_class = OfferResponseSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
-    queryset = OfferResponse.objects.all()
-    http_method_names = ['get', 'put', 'patch', 'post', 'head', 'options']
+        data = {
+            "cars": total_cars,
+            "properties": total_properties,
+            "offers": total_offers,
+        }
+        return Response(data)
 class APIRootView(APIView):
     """
     API Root view providing links to major application endpoints.

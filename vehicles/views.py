@@ -7,14 +7,17 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from knox.auth import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
+
+from properties.constants import PREDEFINED_CAR_DATA
 from .filters import CarFilter
 from .models import (
     CarAdvertisement, CarImage,CarExternalFeature, CarInternalFeature
 )
 from .serializers import (
     CarAdminListSerializer, CarDetailSerializer, CarAdminCreateUpdateSerializer,
-    CarListSerializer, CarImageSerializer
+    CarListSerializer, CarImageSerializer, CarBasicSerializer
 )
+from .utils import get_model_form_schema
 
 
 class CarAdminViewSet(viewsets.ModelViewSet):
@@ -117,6 +120,16 @@ class CarAdminViewSet(viewsets.ModelViewSet):
                  new_cover.save(update_fields=['is_cover'])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class CarBasicListView(generics.ListAPIView):
+    serializer_class = CarBasicSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+    queryset = CarAdvertisement.objects.filter(is_active=True).prefetch_related('images').order_by('-published_date')
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active']
+    search_fields = ['title']
+    ordering_fields = ['published_date', 'price', 'title']
+
 class PublicCarListView(generics.ListAPIView):
     serializer_class = CarListSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -167,3 +180,22 @@ class CarInternalFeaturesMetadataView(APIView):
     def get(self, request, *args, **kwargs):
         internal_features = get_feature_metadata(CarInternalFeature)
         return Response(internal_features)
+
+class CarAdvertisementFormSchemaView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            main_model = CarAdvertisement
+            form_meta = get_model_form_schema(main_model)
+
+            response_data = {
+                          "form_meta": form_meta,
+                          "brand_series_map": PREDEFINED_CAR_DATA
+            }
+            return Response(response_data)
+        except Exception as e:
+            print(f"Error generating schema: {e}")
+            import traceback
+            traceback.print_exc()
+            return Response({"error": "Could not generate form schema.", "details": str(e)}, status=500)

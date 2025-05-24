@@ -18,9 +18,9 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from accounts.views import APIRootView
-from properties.views import LatestAdvertisementsView, CombinedFilterOptionsView
-
+from accounts.views import APIRootView, DashboardTotalsView
+from properties.views import LatestAdvertisementsView, CombinedFilterOptionsView, PropertyBasicListView
+from vehicles.views import CarBasicListView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -30,6 +30,10 @@ urlpatterns = [
     path('api/cars/', include('vehicles.urls')),
     path('api/latest-advertisements/', LatestAdvertisementsView.as_view(), name='public-latest-combined-ads'),
     path('api/filter-options/', CombinedFilterOptionsView.as_view(), name='public-all-filter-options'),
+    path('api/totals/', DashboardTotalsView.as_view(), name='dashboard-totals'),
+    path('api/propertiesbasic/', PropertyBasicListView.as_view(), name='property-basic-list'),
+    path('api/carsbasic/', CarBasicListView.as_view(), name='car-basic-list'),
+
 
 ]
 

@@ -16,11 +16,15 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .models import PropertyAdvertisement, PropertyImage, Location, PropertyInteriorFeature, PropertyExternalFeature
 from .serializers import (
     PropertyAdminListSerializer, PropertyDetailSerializer, PropertyAdminCreateUpdateSerializer,
-    PropertyListSerializer, PropertyImageSerializer, LatestAdvertisementSerializer
+    PropertyListSerializer, PropertyImageSerializer, LatestAdvertisementSerializer, PropertyBasicSerializer
 )
 from .filters import PropertyFilter
 from vehicles.models import CarAdvertisement
 from .constants import PREDEFINED_CAR_DATA, PROPERTY_TYPE_TR_LABELS_MAP, VEHICLE_TYPE_TR_LABELS_MAP, LOCATION_JSON_FILE_PATH
+from .utils import get_dynamic_model_form_schema
+from .data_loaders import CITY_AREAS_DATA
+
+
 
 
 class PropertyAdminViewSet(viewsets.ModelViewSet):
@@ -173,7 +177,15 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
+class PropertyBasicListView(generics.ListAPIView):
+    serializer_class = PropertyBasicSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+    queryset = PropertyAdvertisement.objects.filter(is_active=True).prefetch_related('images').order_by('-published_date')
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active']
+    search_fields = ['title']
+    ordering_fields = ['published_date', 'price', 'title']
 class PublicPropertyListView(generics.ListAPIView):
     """View for listing ACTIVE properties publicly"""
     serializer_class = PropertyListSerializer
@@ -373,6 +385,13 @@ class CombinedFilterOptionsView(APIView):
             choices_tuple=CarAdvertisement.VEHICLE_TYPE_CHOICES,
             tr_label_map=VEHICLE_TYPE_TR_LABELS_MAP
         )
+        fuel_types = get_choices_as_list_of_dicts(
+            choices_tuple=CarAdvertisement.FUEL_TYPE_CHOICES,
+        )
+
+        gear_types = get_choices_as_list_of_dicts(
+            choices_tuple=CarAdvertisement.GEAR_TYPE_CHOICES,
+        )
 
         predefined_brands_list = []
         for brand_name in PREDEFINED_CAR_DATA.keys():
@@ -403,6 +422,8 @@ class CombinedFilterOptionsView(APIView):
 
         return {
             "vehicleTypes": vehicle_types,
+            "fuelTypes": fuel_types,
+            "transmissionTypes": gear_types,
             "modelYears": model_years_for_dropdown,
             "brandSeriesData": brand_series_structure,
         }
@@ -414,3 +435,61 @@ class CombinedFilterOptionsView(APIView):
         }
         return Response(data)
 
+
+
+class PropertyAdvertisementFormSchemaView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        main_model = PropertyAdvertisement
+        app_label = main_model._meta.app_label
+
+
+        property_special_handlers = {
+            "location": {
+                "type": "location_picker_new",
+                "field_name_match": "location",
+                "related_model_app": app_label,
+                "related_model_name": "Location",
+                "data_source_key": "cityAreas",
+                "city_object_value_key": "value",
+                "city_object_label_en_key": "label_en",
+                "city_object_label_tr_key": "label_tr",
+                "city_object_areas_list_key": "areas",
+                "area_object_value_key": "value",
+                "area_object_label_key": "label",
+                "city_payload_key": "city",
+                "area_payload_key": "area",
+            }
+        }
+
+        property_nested_objects = {
+            'external_features': 'PropertyExternalFeature',
+            'interior_features': 'PropertyInteriorFeature',
+        }
+        property_list_children = {
+            'images': 'PropertyImage',
+        }
+        property_single_field_one_to_one = {
+            'explanation': ('PropertyExplanation', 'explanation'),
+        }
+
+        try:
+            form_meta = get_dynamic_model_form_schema(
+                main_model,
+                app_label=app_label,
+                nested_object_relations_config=property_nested_objects,
+                list_child_relations_config=property_list_children,
+                single_field_one_to_one_config=property_single_field_one_to_one,
+                special_handlers=property_special_handlers
+            )
+
+            response_data = {
+                "form_meta": form_meta,
+                "cityAreas": CITY_AREAS_DATA,
+            }
+            return Response(response_data)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({"error": "Could not generate property form schema.", "details": str(e)}, status=500)

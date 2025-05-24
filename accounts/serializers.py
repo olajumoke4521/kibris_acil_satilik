@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import OfferImage, Offer, OfferResponse
+from .models import OfferImage, Offer, OfferResponse, PropertyOffer, CarOffer
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -102,69 +102,167 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
+class CarOfferDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CarOffer
+        fields = ['model', 'kilometer', 'model_year', 'brand', 'fuel_type', 'transmission']
+
+
+class PropertyOfferDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PropertyOffer
+        fields = ['address', 'build_date', 'square_meter', 'document_type', 'room_type']
+
+
 class OfferImageSerializer(serializers.ModelSerializer):
-    """Serializer for OfferImage objects"""
-    image_url = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = OfferImage
-        fields = ('id', 'image', 'image_url', 'uploaded_at')
-        read_only_fields = ('id', 'image_url', 'uploaded_at')
+        fields = ['id', 'image', 'is_cover_image', 'is_active', 'uploaded_at', 'offer']
+        read_only_fields = ['id', 'uploaded_at']
+        extra_kwargs = {'offer': {'write_only': True, 'required': False}}
 
-    def get_image_url(self, obj):
+    def get_image(self, obj):
         request = self.context.get('request')
-        if obj.image and request:
+        if obj.image and hasattr(obj.image, 'url') and request:
             return request.build_absolute_uri(obj.image.url)
         return None
 
+class OfferResponseSerializer(serializers.ModelSerializer):
+    created_by_details = UserSerializer(source='created_by', read_only=True)
+    offered_by_details = UserSerializer(source='offered_by', read_only=True)
+
+    created_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source='created_by', write_only=True, required=False, allow_null=True
+    )
+    offered_by_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source='offered_by', write_only=True, required=False, allow_null=True
+    )
+
+    class Meta:
+        model = OfferResponse
+        fields = [
+            'id', 'offer', 'price', 'currency', 'description', 'offer_date',
+            'created_by_details',
+            'created_by_id',
+            'offered_by_details',
+            'offered_by_id',
+            'is_active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'offer', 'created_at', 'updated_at', 'created_by_details', 'offered_by_details']
+
+
+    def create(self, validated_data):
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+
+        return super().update(instance, validated_data)
+
 class UserOfferCreateSerializer(serializers.ModelSerializer):
+    # Car specific fields (conditionally required)
+    model = serializers.CharField(max_length=100, required=False, allow_null=True)
+    brand = serializers.CharField(max_length=100, required=False, allow_null=True)
+    fuel_type = serializers.ChoiceField(choices=CarOffer.FUEL_TYPE_CHOICES, required=False, allow_null=True)
+    transmission = serializers.ChoiceField(choices=CarOffer.TRANSMISSION_CHOICES, required=False, allow_null=True)
+    kilometer = serializers.IntegerField(required=False, allow_null=True)
+    model_year = serializers.IntegerField(required=False, allow_null=True)
+
+    # Property specific fields (conditionally required)
+    address = serializers.CharField(required=False, allow_null=True)
+    build_date = serializers.IntegerField(required=False, allow_null=True)
+    square_meter = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    room_type = serializers.ChoiceField(choices=PropertyOffer.ROOM_TYPE_CHOICES, required=False, allow_null=True)
+    document_type = serializers.ChoiceField(choices=PropertyOffer.DOCUMENT_TYPE_CHOICES, required=False, allow_null=True)
+
+    images = serializers.ListField(
+        child=serializers.ImageField(allow_empty_file=False, use_url=False),
+        write_only=True,
+        required=False
+    )
+
     class Meta:
         model = Offer
         fields = [
-            'full_name', 'email', 'phone', 'offer_type', 'details',
-            'model_name', 'kilometers', 'model_year',
-            'address', 'build_date', 'square_meters', 'room_type',
+            'full_name', 'email', 'phone', 'details', 'offer_type', 'city', 'area', 'price',
+            'model', 'kilometer', 'model_year', 'fuel_type', 'transmission', 'brand',
+            'address', 'build_date', 'square_meter', 'room_type', 'document_type',
+            'images'
         ]
 
     def validate(self, attrs):
         offer_type = attrs.get('offer_type')
-        email = attrs.get('email')
-        phone = attrs.get('phone')
-        if not email and not phone:
-            raise serializers.ValidationError("Please provide either an email or phone number.")
-        if offer_type == 'property':
-            required_property_fields = ['build_date', 'square_meters', 'room_type']
-            for field in required_property_fields:
-                if not attrs.get(field):
-                    raise serializers.ValidationError(
-                        f"{field.replace('_', ' ').title()} is required for property offers."
-                    )
 
-        elif offer_type == 'car':
-            required_car_fields = ['model_name', 'kilometers', 'model_year']
+        if not attrs.get('email') and not attrs.get('phone'):
+            raise serializers.ValidationError("Either email or phone number must be provided.")
+
+        if offer_type == 'car':
+            required_car_fields = ['model', 'kilometer', 'model_year', 'brand', 'fuel_type', 'transmission']
             for field in required_car_fields:
                 if not attrs.get(field):
-                    raise serializers.ValidationError(
-                        f"{field.replace('_', ' ').title()} is required for car offers."
-                    )
-
+                    raise serializers.ValidationError({field: f"This field is required for car offers."})
+        elif offer_type == 'property':
+            required_property_fields = ['address', 'build_date', 'square_meter', 'room_type', 'document_type']
+            for field in required_property_fields:
+                if not attrs.get(field):
+                    raise serializers.ValidationError({field: f"This field is required for property offers."})
         return attrs
 
+    def create(self, validated_data):
+        car_fields = ['model', 'kilometer', 'model_year', 'brand', 'fuel_type', 'transmission']
+        property_fields = ['address', 'build_date', 'square_meter', 'room_type', 'document_type']
+        images = validated_data.pop('images', [])
 
-class OfferResponseSerializer(serializers.ModelSerializer):
-    user_offer = serializers.PrimaryKeyRelatedField(read_only=True)
+        car_data = {f: validated_data.pop(f) for f in car_fields if f in validated_data}
+        property_data = {f: validated_data.pop(f) for f in property_fields if f in validated_data}
 
-    class Meta:
-        model = OfferResponse
-        fields = ('id', 'user_offer', 'offer_price', 'offer_description', 'offer_date', 'created_at', 'admin_user')
-        read_only_fields = ('id', 'created_at', 'offer_date', 'admin_user')
+        offer = Offer.objects.create(**validated_data)
+
+        if offer.offer_type == 'car' and car_data:
+            CarOffer.objects.create(offer=offer, **car_data)
+        elif offer.offer_type == 'property' and property_data:
+            PropertyOffer.objects.create(offer=offer, **property_data)
+
+        for image_file in images:
+            OfferImage.objects.create(offer=offer, image=image_file)
+
+        return offer
 
 class UserOfferAdminSerializer(serializers.ModelSerializer):
     images = OfferImageSerializer(many=True, read_only=True)
-    admin_responses = OfferResponseSerializer(many=True, read_only=True) # Show nested responses
-    offer_type_display = serializers.CharField(source='get_offer_type_display', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    responses = OfferResponseSerializer(many=True, read_only=True)
+
+    car_details = CarOfferDetailsSerializer(read_only=True, required=False)
+    property_details = PropertyOfferDetailsSerializer(read_only=True, required=False)
 
     class Meta:
         model = Offer
-        fields = '__all__'
+        fields = [
+            'id', 'full_name', 'email', 'phone', 'details',
+            'offer_type', 'city', 'area', 'price',
+            'is_active', 'created_at', 'updated_at',
+            'images',
+            'car_details',
+            'property_details',
+            'responses'
+        ]
+
+    def to_representation(self, instance):
+        """
+        Clean up representation to only include relevant details sub-object.
+        """
+        ret = super().to_representation(instance)
+        if instance.offer_type == 'car':
+            if 'property_details' in ret:
+                del ret['property_details']
+        elif instance.offer_type == 'property':
+            if 'car_details' in ret:
+                del ret['car_details']
+        else:
+            if 'property_details' in ret: del ret['property_details']
+            if 'car_details' in ret: del ret['car_details']
+        return ret
+
+

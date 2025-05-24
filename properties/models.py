@@ -40,6 +40,10 @@ class PropertyAdvertisement(models.Model):
         ('on', 'ON'),
         ('off', 'OFF'),
     ]
+    ADVERT_STATUS_CHOICES_TR = [
+        ('on', 'Yayında'),
+        ('off', 'Yayında Değil'),
+    ]
     advertise_status = models.CharField(max_length=10, choices=ADVERT_STATUS_CHOICES, default='on')
     published_date = models.DateTimeField(auto_now_add=True)
 
@@ -80,11 +84,26 @@ class PropertyAdvertisement(models.Model):
         ('abandoned_building', 'Abandoned Building'),
         ('half_construction', 'Half Construction'),
     ]
-
+    PROPERTY_TYPE_CHOICES_TR = {
+        'villa': 'Villa', 'apartment': 'Apartman',
+        'residence': 'Rezidans',
+        'twin_villa': 'İkiz Villa',
+        'penthouse': 'Çatı katı',
+        'bungalow': 'Bungalov',
+        'family_house': 'Aile Evleri',
+        'complete_building': 'Eksiksiz Bina',
+        'timeshare': 'Devremülk',
+        'abandoned_building': 'Terkedilmiş Bina',
+        'half_construction': 'Yarım İnşaat'
+    }
     property_type = models.CharField(max_length=50, choices=PROPERTY_TYPE_CHOICES)
     ADVERTISEMENT_TYPE_CHOICES = [
-        ('sale', 'Sale'),
-        ('rent', 'Rent'),
+        ('sale', 'For Sale'),
+        ('rent', 'For Rent'),
+    ]
+    ADVERTISEMENT_TYPE_CHOICES_TR = [
+        ('sale', 'Satılık'),
+        ('rent', 'Kiralık'),
     ]
     advertisement_type = models.CharField(max_length=50, choices=ADVERTISEMENT_TYPE_CHOICES)
     gross_area = models.DecimalField(max_digits=20, decimal_places=2, blank=True, null=True)
@@ -95,12 +114,27 @@ class PropertyAdvertisement(models.Model):
 
     WARMING_TYPE_CHOICES = [
         ('natural_gas', 'Natural Gas'),
-        ('geothermal', 'Geothermal'),
-        ('solar', 'Solar'),
-        ('air_conditioned', 'Air_Conditioned'),
+        ('central_heating', 'Central Heating'),
+        ('underfloor_heating', 'Underfloor Heating'),
+        ('stove', 'Stove (Wood/Coal)'),
+        ('electric_heater', 'Electric Heater'),
+        ('geothermal', 'Geothermal Heating'),
+        ('solar', 'Solar Heating'),
+        ('air_conditioner', 'Air Conditioner'),
         ('no_heating', 'No Heating'),
     ]
-    warming_type = models.CharField(max_length=15, choices=WARMING_TYPE_CHOICES, blank=True, null=True)
+    WARMING_TYPE_CHOICES_TR = [
+        ('natural_gas', 'Doğalgaz'),
+        ('central_heating', 'Merkezi Isıtma'),
+        ('underfloor_heating', 'Yerden Isıtma'),
+        ('stove', 'Soba (Odun/Kömür)'),
+        ('electric_heater', 'Elektrikli Isıtıcı'),
+        ('geothermal', 'Jeotermal Isıtma'),
+        ('solar', 'Güneş Enerjisi ile Isıtma'),
+        ('air_conditioner', 'Klima'),
+        ('no_heating', 'Isıtma Yok'),
+    ]
+    warming_type = models.CharField(max_length=50, choices=WARMING_TYPE_CHOICES, blank=True, null=True)
     dues = models.DecimalField(max_digits=50, decimal_places=2, blank=True, null=True)
     dues_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE_CHOICES, default='GBP')
     rent = models.DecimalField(max_digits=50, decimal_places=2, blank=True, null=True)

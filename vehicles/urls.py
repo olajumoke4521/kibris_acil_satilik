@@ -14,6 +14,7 @@ urlpatterns = [
          name='car-external-features-metadata'),
     path('features/internal/', views.CarInternalFeaturesMetadataView.as_view(),
          name='car-internal-features-metadata'),
+    path('admin/form-schema/', views.CarAdvertisementFormSchemaView.as_view(), name='car_ad_form_schema'),
 
     # Admin URLs
     path('', include(router.urls)),

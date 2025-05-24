@@ -86,7 +86,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'kibris_acil_satilik.wsgi.application'
 
-
+LOCATION_MODEL_APP_LABEL = 'properties'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 

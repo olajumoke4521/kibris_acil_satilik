@@ -66,6 +66,56 @@ class Offer(models.Model):
         ('car', 'Car'),
         ('property', 'Property'),
     ]
+
+    full_name = models.CharField(max_length=255)
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    offer_type = models.CharField(max_length=10, choices=OFFER_TYPE_CHOICES)
+    details = models.TextField(blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    area = models.CharField(max_length=100, blank=True, null=True)
+    price = models.DecimalField(max_digits=20, decimal_places=2)
+    CURRENCY_CHOICES = [
+        ('USD', 'USD'), ('EUR', 'EUR'), ('GBP', 'GBP'), ('TRY', 'TRY'),
+    ]
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='GBP')
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "User Offer Request"
+
+    def __str__(self):
+        return f"Offer ({self.get_offer_type_display()}) from {self.full_name} - {self.id}"
+
+class CarOffer(models.Model):
+    offer = models.OneToOneField(Offer, on_delete=models.CASCADE, primary_key=True, related_name='car_details')
+    model = models.CharField(max_length=100, blank=True, null=True)
+    brand = models.CharField(max_length=100, blank=True, null=True)
+    kilometer = models.PositiveIntegerField(blank=True, null=True, verbose_name="Kilometers (KM)")
+    model_year = models.PositiveIntegerField(blank=True, null=True)
+    FUEL_TYPE_CHOICES = [
+        ('diesel', 'Diesel'), ('gasoline', 'Gasoline'), ('lpg', 'LPG'),
+        ('hybrid', 'Hybrid'), ('electric', 'Electric'),
+    ]
+    fuel_type = models.CharField(max_length=50, choices=FUEL_TYPE_CHOICES, blank=True, null=True)
+    TRANSMISSION_CHOICES = [
+        ('automatic', 'Automatic'), ('manual', 'Manual'), ('semi-automatic', 'Semi-Automatic'),
+    ]
+    transmission = models.CharField(max_length=15, choices=TRANSMISSION_CHOICES)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Car: {self.model} ({self.model_year}) for Offer {self.offer.id}"
+
+class PropertyOffer(models.Model):
+    offer = models.OneToOneField(Offer, on_delete=models.CASCADE, primary_key=True, related_name='property_details')
+    build_date = models.PositiveIntegerField(blank=True, null=True)
+    square_meter = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True,
+                                        verbose_name="Area (m²)")
     ROOM_TYPE_CHOICES = [
         ('1+0', '1+0'),
         ('1+1', '1+1'),
@@ -88,75 +138,56 @@ class Offer(models.Model):
         ('7+3', '7+3'),
         ('8+', '8+'),
     ]
-    full_name = models.CharField(max_length=255)
-    email = models.EmailField(blank=True, null=True)
-    phone = models.CharField(max_length=20, blank=True, null=True)
-
-    offer_type = models.CharField(max_length=10, choices=OFFER_TYPE_CHOICES)
-    details = models.TextField(blank=True, null=True)
-
-    # Car Specific Fields
-    model_name = models.CharField(max_length=100, blank=True, null=True)
-    kilometers = models.PositiveIntegerField(blank=True, null=True, verbose_name="Kilometers (KM)")
-    model_year = models.PositiveIntegerField(blank=True, null=True)
-
-    # Property Specific Fields
-    address = models.TextField(blank=True, null=True)
-    city = models.CharField(max_length=100, blank=True, null=True)
-    area = models.CharField(max_length=100, blank=True, null=True)
-    build_date = models.DateField(blank=True, null=True)
-    square_meters = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True,
-                                                 verbose_name="Area (m²)")
-    room_type = models.CharField(max_length=50, blank=True, null=True)
-
+    room_type = models.CharField(max_length=100, choices=ROOM_TYPE_CHOICES)
+    DOCUMENT_TYPE_CHOICES = [
+        ('tahsis_kocan', 'Tahsis Koçan'),
+        ('turk_kocan', 'Türk Koçan'),
+        ('esdeger_kocan', 'Eşdeğer Koçan'),
+    ]
+    document_type = models.CharField(max_length=100, choices=DOCUMENT_TYPE_CHOICES)
+    address = models.TextField()
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = "User Offer Request"
 
     def __str__(self):
-        return f"Offer ({self.get_offer_type_display()}) from {self.full_name} - {self.id}"
-
+        return f"Property at {self.address[:30]} for Offer {self.offer.id}"
 
 class OfferImage(models.Model):
     id = models.AutoField(primary_key=True)
-    offer_request  = models.ForeignKey(Offer, on_delete=models.CASCADE, related_name='images')
+    offer  = models.ForeignKey(Offer, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(
         upload_to='offer_images/',
         validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])]
     )
+    is_cover_image = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)  #
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Image for Offer {self.offer_request .id}"
+        return f"Image for Offer {self.offer.id} ({self.image.name.split('/')[-1]})"
 
 
 class OfferResponse(models.Model):
-    id = models.AutoField(primary_key=True)
-    user_offer = models.ForeignKey(Offer, on_delete=models.CASCADE, related_name='admin_responses')
-
-    admin_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="created_offer_responses")
-
-    offer_price = models.DecimalField(max_digits=20, decimal_places=2)
-    CURRENCY_TYPE_CHOICES = [
-        ('USD', 'USD'),
-        ('EUR', 'EUR'),
-        ('GBP', 'GBP'),
-        ('TRY', 'TRY'),
+    CURRENCY_CHOICES = [
+        ('USD', 'USD'), ('EUR', 'EUR'), ('GBP', 'GBP'), ('TRY', 'TRY'),
     ]
-    offer_price_currency = models.CharField(max_length=3, choices=CURRENCY_TYPE_CHOICES, default='GBP')
-    offer_description = models.TextField()
-    offer_date = models.DateField(blank=True, null=True)
-
+    id = models.AutoField(primary_key=True)
+    offer = models.ForeignKey(Offer, on_delete=models.CASCADE, related_name='responses')
+    price = models.DecimalField(max_digits=20, decimal_places=2)
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='GBP')
+    description = models.TextField()
+    offer_date = models.DateField(default=timezone.now)
+    created_by= models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="created_offer_responses")
+    offered_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="officially_made_offers",)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-offer_date']
+        ordering = ['-offer_date', '-created_at']
+        verbose_name = "Admin Offer Response"
+        verbose_name_plural = "Admin Offer Responses"
 
     def __str__(self):
-        return f"Admin Response to {self.user_offer.full_name}'s Offer ({self.user_offer.id}) - {self.offer_date.strftime('%Y-%m-%d')}"
+        creator_email = self.created_by.email if self.created_by else "System"
+        offerer_email = self.offered_by.email if self.offered_by else "N/A"
+        return f"Response to Offer {self.offer.id} ({self.price} {self.currency}) by {offerer_email} (created by {creator_email})"
