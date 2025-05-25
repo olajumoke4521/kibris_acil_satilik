@@ -101,6 +101,45 @@ class LoginSerializer(serializers.Serializer):
         attrs['user'] = user
         return attrs
 
+class UserEmailRelatedField(serializers.RelatedField):
+    default_error_messages = {
+        'required': 'This field is required.',
+        'does_not_exist': 'User with email "{email_value}" does not exist.',
+        'incorrect_type': 'Incorrect type. Expected a string representing an email.',
+    }
+
+    def __init__(self, **kwargs):
+        if not kwargs.get('read_only', False):
+            if 'queryset' not in kwargs:
+                 kwargs['queryset'] = User.objects.all()
+        else:
+            kwargs.pop('queryset', None)
+
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        if data == "" and getattr(self, 'allow_empty', False):
+            if getattr(self, 'allow_null', False):
+                return None
+            else:
+                self.fail('required')
+
+        if not isinstance(data, str):
+            self.fail('incorrect_type')
+        try:
+            user = User.objects.get(email__iexact=data)
+            return user
+        except User.DoesNotExist:
+            self.fail('does_not_exist', email_value=data)
+        except User.MultipleObjectsReturned:
+            self.fail('does_not_exist', email_value=data)
+
+    def to_representation(self, value):
+        if isinstance(value, User):
+            return value.email
+        if value is None and getattr(self, 'allow_null', False):
+            return None
+        return str(value)
 
 class CarOfferDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -130,27 +169,18 @@ class OfferImageSerializer(serializers.ModelSerializer):
         return None
 
 class OfferResponseSerializer(serializers.ModelSerializer):
-    created_by_details = UserSerializer(source='created_by', read_only=True)
-    offered_by_details = UserSerializer(source='offered_by', read_only=True)
-
-    created_by_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), source='created_by', write_only=True, required=False, allow_null=True
-    )
-    offered_by_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), source='offered_by', write_only=True, required=False, allow_null=True
-    )
+    created_by = UserEmailRelatedField(read_only=True, allow_null=True)
+    offered_by = UserEmailRelatedField(required=False, allow_null=True, allow_empty=True)
 
     class Meta:
         model = OfferResponse
         fields = [
             'id', 'offer', 'price', 'currency', 'description', 'offer_date',
-            'created_by_details',
-            'created_by_id',
-            'offered_by_details',
-            'offered_by_id',
+            'created_by',
+            'offered_by',
             'is_active', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'offer', 'created_at', 'updated_at', 'created_by_details', 'offered_by_details']
+        read_only_fields = ['id', 'offer', 'created_at', 'updated_at']
 
 
     def create(self, validated_data):

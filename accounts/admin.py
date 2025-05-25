@@ -78,7 +78,6 @@ class CarOfferInline(admin.StackedInline):
     can_delete = True
     verbose_name_plural = 'Car Specific Details'
     fk_name = 'offer'
-
     extra = 0
 
 class PropertyOfferInline(admin.StackedInline):
@@ -86,7 +85,6 @@ class PropertyOfferInline(admin.StackedInline):
     can_delete = True
     verbose_name_plural = 'Property Specific Details'
     fk_name = 'offer'
-    # fields = ['address', 'build_date', 'square_meter', 'room_type', 'document_type']
     extra = 0
 
 class OfferImageInline(admin.TabularInline):
@@ -152,36 +150,20 @@ class OfferAdmin(admin.ModelAdmin):
 
 @admin.register(CarOffer)
 class CarOfferAdmin(admin.ModelAdmin):
-    list_display = ('offer_id_link', 'model', 'brand', 'kilometer', 'model_year', 'is_active')
+    list_display = ('model', 'brand', 'kilometer', 'model_year', 'is_active')
     list_filter = ('brand', 'fuel_type', 'transmission', 'is_active', 'model_year')
     search_fields = ('offer__full_name', 'model', 'brand', 'offer__id')
     autocomplete_fields = ['offer']
     readonly_fields = ('offer',)
 
-    def offer_id_link(self, obj):
-        from django.urls import reverse
-        from django.utils.html import format_html
-        link = reverse("admin:your_app_name_offer_change", args=[obj.offer.id])
-        return format_html('<a href="{}">{} (View Offer)</a>', link, obj.offer.id)
-    offer_id_link.short_description = 'Offer ID'
-    offer_id_link.admin_order_field = 'offer__id'
-
 
 @admin.register(PropertyOffer)
 class PropertyOfferAdmin(admin.ModelAdmin):
-    list_display = ('offer_id_link', 'address_short', 'room_type', 'document_type', 'is_active')
+    list_display = ('address_short', 'room_type', 'document_type', 'is_active')
     list_filter = ('document_type', 'room_type', 'is_active', 'offer__city')
     search_fields = ('offer__full_name', 'address', 'offer__id')
     autocomplete_fields = ['offer']
     readonly_fields = ('offer',)
-
-    def offer_id_link(self, obj):
-        from django.urls import reverse
-        from django.utils.html import format_html
-        link = reverse("admin:your_app_name_offer_change", args=[obj.offer.id]) # Replace your_app_name
-        return format_html('<a href="{}">{} (View Offer)</a>', link, obj.offer.id)
-    offer_id_link.short_description = 'Offer ID'
-    offer_id_link.admin_order_field = 'offer__id'
 
     def address_short(self, obj):
         return obj.address[:50] + '...' if len(obj.address) > 50 else obj.address
