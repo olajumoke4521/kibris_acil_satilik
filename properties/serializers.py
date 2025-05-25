@@ -13,14 +13,14 @@ class LocationSerializer(serializers.ModelSerializer):
         fields = ('id', 'city', 'area')
 
 class PropertyImageSerializer(serializers.ModelSerializer):
-    image_url = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = PropertyImage
-        fields = ('id', 'image', 'image_url', 'is_cover', 'uploaded_at')
-        read_only_fields = ('id', 'image_url', 'uploaded_at')
+        fields = ('id', 'image', 'is_cover', 'uploaded_at')
+        read_only_fields = ('id', 'uploaded_at')
 
-    def get_image_url(self, obj):
+    def get_image(self, obj):
         request = self.context.get('request')
         if obj.image and request:
             return request.build_absolute_uri(obj.image.url)
@@ -115,9 +115,8 @@ class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
         interior_features_data = validated_data.pop('interior_features', None)
         explanation_data = validated_data.pop('explanation', None)
 
-        validated_data.pop('province', None)
-        validated_data.pop('district', None)
-        validated_data.pop('neighborhood', None)
+        validated_data.pop('city', None)
+        validated_data.pop('area', None)
 
         property_instance = PropertyAdvertisement.objects.create(**validated_data)
 
@@ -137,9 +136,8 @@ class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
         interior_features_data = validated_data.pop('interior_features', None)
         explanation_data = validated_data.pop('explanation', None)
 
-        validated_data.pop('province', None)
-        validated_data.pop('district', None)
-        validated_data.pop('neighborhood', None)
+        validated_data.pop('city', None)
+        validated_data.pop('area', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)

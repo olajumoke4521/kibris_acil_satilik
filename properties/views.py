@@ -25,8 +25,6 @@ from .utils import get_dynamic_model_form_schema
 from .data_loaders import CITY_AREAS_DATA
 
 
-
-
 class PropertyAdminViewSet(viewsets.ModelViewSet):
 
     queryset = PropertyAdvertisement.objects.select_related(
