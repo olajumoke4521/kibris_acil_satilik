@@ -1,3 +1,4 @@
+from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models.fields.reverse_related import (
     ManyToOneRel,
@@ -6,7 +7,48 @@ from django.db.models.fields.reverse_related import (
 )
 from django.apps import apps
 from django.conf import settings
+import base64
+import uuid
 
+def base64_to_image_file(base64_string, name_prefix="img_"):
+    """
+    Converts a base64 string (possibly a data URI) to a Django ContentFile.
+    """
+    if not base64_string or not isinstance(base64_string, str):
+        return None
+
+    try:
+        if ';base64,' in base64_string:
+            header, base64_data = base64_string.split(';base64,', 1)
+            if 'data:' in header:
+                mime_type = header.split('data:', 1)[1].split(';')[0]
+            else:
+                mime_type = ''
+        else:
+            base64_data = base64_string
+            mime_type = '' # No mime type info available
+
+        ext = 'bin' # Default extension
+        if mime_type:
+            mime_map = {
+                'image/jpeg': 'jpg',
+                'image/png': 'png',
+                'image/gif': 'gif',
+                'image/webp': 'webp',
+                'image/avif': 'avif',
+                'image/svg+xml': 'svg',
+            }
+            ext = mime_map.get(mime_type.lower(), mime_type.split('/')[-1] if '/' in mime_type else 'bin')
+            ext = ''.join(filter(str.isalnum, ext))[:5] if ext else 'bin'
+            if not ext: ext = 'bin'
+        elif len(base64_data) % 4 == 0 :
+            ext = 'png'
+
+        decoded_file = base64.b64decode(base64_data)
+        file_name = f"{name_prefix}{uuid.uuid4()}.{ext}"
+        return ContentFile(decoded_file, name=file_name)
+    except Exception:
+        return None
 
 def get_frontend_field_type(field):
     if field.choices:

@@ -61,7 +61,7 @@ class PropertyBasicSerializer(serializers.ModelSerializer):
         if cover_image_instance:
             request = self.context.get('request')
             image_serializer_data = PropertyImageSerializer(cover_image_instance, context={'request': request}).data
-            return image_serializer_data.get('image_url')
+            return image_serializer_data.get('image')
         return None
 
 class PropertyListSerializer(serializers.ModelSerializer):
@@ -113,6 +113,7 @@ class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
 
         external_features_data = validated_data.pop('external_features', None)
         interior_features_data = validated_data.pop('interior_features', None)
+        print(interior_features_data)
         explanation_data = validated_data.pop('explanation', None)
 
         validated_data.pop('city', None)

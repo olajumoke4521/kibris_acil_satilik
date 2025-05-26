@@ -1,10 +1,5 @@
-import json
-import os
 import datetime
-from django.conf import settings
-from django.core.exceptions import ValidationError, ObjectDoesNotExist
-from django.core.validators import validate_email
-from django.db import transaction, IntegrityError
+from django.db import transaction
 from django.db import models
 from rest_framework import viewsets, permissions, status, generics, filters
 from rest_framework.decorators import action
@@ -20,8 +15,9 @@ from .serializers import (
 )
 from .filters import PropertyFilter
 from vehicles.models import CarAdvertisement
-from .constants import PREDEFINED_CAR_DATA, PROPERTY_TYPE_TR_LABELS_MAP, VEHICLE_TYPE_TR_LABELS_MAP, LOCATION_JSON_FILE_PATH
-from .utils import get_dynamic_model_form_schema
+from .constants import PREDEFINED_CAR_DATA, PROPERTY_TYPE_TR_LABELS_MAP, VEHICLE_TYPE_TR_LABELS_MAP, \
+    FUEL_TYPE_TR_LABELS_MAP, TRANSMISSION_TR_LABELS_MAP, WARMING_TYPE_TR_LABELS_MAP
+from .utils import get_dynamic_model_form_schema, base64_to_image_file
 from .data_loaders import CITY_AREAS_DATA
 
 
@@ -32,7 +28,7 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
     ).prefetch_related('images').all()
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    parser_classes = [FormParser, JSONParser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = PropertyFilter
     search_fields = ['title', 'advertise_no', 'explanation__explanation', 'location__city', 'location__area']
@@ -67,6 +63,13 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
+        images_payload_list = data.pop('images', None)
+
+        if images_payload_list is not None and not isinstance(images_payload_list, list):
+            return Response(
+                {"detail": "The 'images_payload' field must be a list of image objects."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
 
@@ -77,15 +80,39 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
 
         instance = serializer.save(user=self.request.user, location=location_obj)
 
-        images_data = request.FILES.getlist('images')
-        if images_data:
-            make_first_cover = not PropertyImage.objects.filter(property_ad=instance, is_cover=True).exists()
-            for i, image_file in enumerate(images_data):
-                PropertyImage.objects.create(
-                    property_ad=instance,
-                    image=image_file,
-                    is_cover=(i == 0 and make_first_cover)
-                )
+        if images_payload_list:
+            for i, image_data_item in enumerate(images_payload_list):
+                if not isinstance(image_data_item, dict):
+                    continue
+
+                base64_str = image_data_item.get('image')
+                is_explicitly_cover = image_data_item.get('is_cover', False)
+                image_content_file = base64_to_image_file(base64_str, name_prefix=f"property_{instance.id}_img_")
+
+                has_explicit_cover_in_payload = any(
+                    img_data.get('is_cover') for img_data in images_payload_list if isinstance(img_data, dict))
+                cover_image_assigned_in_loop = False
+                if image_content_file:
+                    current_image_is_cover = False
+                    if has_explicit_cover_in_payload:
+                        if is_explicitly_cover and not cover_image_assigned_in_loop:
+                            current_image_is_cover = True
+                            cover_image_assigned_in_loop = True
+                    elif not cover_image_assigned_in_loop and i == 0:
+                        current_image_is_cover = True
+                        cover_image_assigned_in_loop = True
+                    PropertyImage.objects.create(
+                        property_ad=instance,
+                        image=image_content_file,
+                        is_cover=current_image_is_cover
+                    )
+        if not PropertyImage.objects.filter(property_ad=instance, is_cover=True).exists():
+            first_available_image = PropertyImage.objects.filter(property_ad=instance).order_by('uploaded_at').first()
+            if first_available_image:
+                first_available_image.is_cover = True
+                first_available_image.save(update_fields=['is_cover'])
+
+        instance.refresh_from_db()
 
         detail_serializer = PropertyDetailSerializer(instance, context=self.get_serializer_context())
         headers = self.get_success_headers(detail_serializer.data)
@@ -114,28 +141,51 @@ class PropertyAdminViewSet(viewsets.ModelViewSet):
         detail_serializer = PropertyDetailSerializer(updated_instance, context=self.get_serializer_context())
         return Response(detail_serializer.data)
 
-    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='upload-images')
+    @action(detail=True, methods=['post'], parser_classes=[JSONParser], url_path='upload-images')
     def upload_images(self, request, pk=None):
         """Upload additional images for a specific property."""
         property_ad = self.get_object()
-        images_data = request.FILES.getlist('images')
-        if not images_data:
-            return Response({"detail": "No images provided."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Check if a cover photo already exists
-        make_first_cover = not PropertyImage.objects.filter(property_ad=property_ad, is_cover=True).exists()
-
+        images_payload_list = request.data.get('images')
+        if not images_payload_list or not isinstance(images_payload_list, list):
+            return Response(
+                {"detail": "'images_payload' field is missing, empty, or not a list of image objects."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         created_images = []
-        for i, image_file in enumerate(images_data):
-            # Check if it's the very first image being uploaded for this property ever
-            is_cover_candidate = (i == 0 and make_first_cover and not property_ad.images.exists())
+        ad_already_has_cover = PropertyImage.objects.filter(property_ad=property_ad, is_cover=True).exists()
+        cover_assigned_in_this_batch = False
+
+        for i, image_data_item in enumerate(images_payload_list):
+            if not isinstance(image_data_item, dict):
+                continue
+            base64_str = image_data_item.get('image_base64')
+            is_explicitly_cover_from_payload = image_data_item.get('is_cover', False)
+
+            image_content_file = base64_to_image_file(base64_str, name_prefix=f"property_{property_ad.id}_upload_")
+
+            if image_content_file:
+                current_image_is_cover = False
+                if not ad_already_has_cover and not cover_assigned_in_this_batch:
+                    if is_explicitly_cover_from_payload:
+                        current_image_is_cover = True
+                        cover_assigned_in_this_batch = True
+                        if current_image_is_cover:
+                            PropertyImage.objects.filter(property_ad=property_ad, is_cover=True).update(is_cover=False)
+                    elif i == 0:
+                        current_image_is_cover = True
+                        cover_assigned_in_this_batch = True
+                elif ad_already_has_cover and is_explicitly_cover_from_payload and not cover_assigned_in_this_batch:
+                    PropertyImage.objects.filter(property_ad=property_ad, is_cover=True).update(is_cover=False)
+                    current_image_is_cover = True
+                    cover_assigned_in_this_batch = True
             img = PropertyImage.objects.create(
                 property_ad=property_ad,
-                image=image_file,
-                is_cover=is_cover_candidate
+                image=image_content_file,
+                is_cover=current_image_is_cover
             )
             created_images.append(img)
-
+            if current_image_is_cover:
+                ad_already_has_cover = True
         serializer = PropertyImageSerializer(created_images, many=True, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -303,79 +353,24 @@ def get_bilingual_choices_as_list_of_dicts(choices_tuple, tr_label_map=None, en_
 class CombinedFilterOptionsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def load_location_data_from_json(self):
-        try:
-            with open(LOCATION_JSON_FILE_PATH, 'r', encoding='utf-8') as f:
-                raw_locations = json.load(f)
-        except FileNotFoundError:
-            print(f"ERROR: Location JSON file not found at {LOCATION_JSON_FILE_PATH}")
-            return []
-        except json.JSONDecodeError:
-            print(f"ERROR: Could not decode JSON from {LOCATION_JSON_FILE_PATH}")
-            return []
-
-        grouped_by_province_value = {}
-
-        for loc in raw_locations:
-            province_val = loc.get("province_value")
-            province_l_tr = loc.get("province_label_tr")
-            province_l_en = loc.get("province_label_en")
-            district_name = loc.get("district")
-
-            if not province_val or not district_name:
-                continue
-
-            if province_val not in grouped_by_province_value:
-                grouped_by_province_value[province_val] = {
-                    "city": {
-                        "value": province_val,
-                        "label_tr": province_l_tr,
-                        "label_en": province_l_en
-                    },
-                    "areas_temp_list": []
-                }
-
-            district_filter_value = district_name.lower().replace(" ", "-").replace("(", "").replace(")", "")
-            area_object = {
-                "value": district_filter_value,
-                "label": district_name
-            }
-
-            grouped_by_province_value[province_val]["areas_temp_list"].append(area_object)
-
-        final_city_areas_data = []
-        for province_value_key, city_data_group in grouped_by_province_value.items():
-            unique_areas = []
-            seen_area_values = set()
-            sorted_areas = sorted(city_data_group["areas_temp_list"], key=lambda x: x['label'])
-
-            for area in sorted_areas:
-                if area["value"] not in seen_area_values:
-                    unique_areas.append(area)
-                    seen_area_values.add(area["value"])
-
-            final_city_areas_data.append({
-                "city": city_data_group["city"],
-                "areas": unique_areas
-            })
-
-        final_city_areas_data.sort(key=lambda x: x['city']['label_tr'])
-
-        return final_city_areas_data
-
     def get_property_options(self):
         property_types = get_bilingual_choices_as_list_of_dicts(
             choices_tuple=PropertyAdvertisement.PROPERTY_TYPE_CHOICES,
             tr_label_map=PROPERTY_TYPE_TR_LABELS_MAP
         )
+        warming_types = get_bilingual_choices_as_list_of_dicts(
+            choices_tuple=PropertyAdvertisement.WARMING_TYPE_CHOICES,
+            tr_label_map=WARMING_TYPE_TR_LABELS_MAP
+        )
         room_types = get_choices_as_list_of_dicts(PropertyAdvertisement.ROOM_TYPE_CHOICES)
-
-        city_areas_data = self.load_location_data_from_json()
+        floor_types = get_choices_as_list_of_dicts(PropertyAdvertisement.FLOOR_TYPE_CHOICES)
 
         return {
             "propertyTypes": property_types,
-            "cityAreas": city_areas_data,
             "roomTypes": room_types,
+            "warmingTypes": warming_types,
+            "floorTypes": floor_types,
+            "cityAreas": CITY_AREAS_DATA,
         }
 
     def get_car_options(self):
@@ -383,12 +378,14 @@ class CombinedFilterOptionsView(APIView):
             choices_tuple=CarAdvertisement.VEHICLE_TYPE_CHOICES,
             tr_label_map=VEHICLE_TYPE_TR_LABELS_MAP
         )
-        fuel_types = get_choices_as_list_of_dicts(
+        fuel_types = get_bilingual_choices_as_list_of_dicts(
             choices_tuple=CarAdvertisement.FUEL_TYPE_CHOICES,
+            tr_label_map=FUEL_TYPE_TR_LABELS_MAP
         )
 
-        gear_types = get_choices_as_list_of_dicts(
-            choices_tuple=CarAdvertisement.GEAR_TYPE_CHOICES,
+        transmission = get_bilingual_choices_as_list_of_dicts(
+            choices_tuple=CarAdvertisement.TRANSMISSION_CHOICES,
+            tr_label_map=TRANSMISSION_TR_LABELS_MAP
         )
 
         predefined_brands_list = []
@@ -421,7 +418,7 @@ class CombinedFilterOptionsView(APIView):
         return {
             "vehicleTypes": vehicle_types,
             "fuelTypes": fuel_types,
-            "transmissionTypes": gear_types,
+            "transmissionTypes": transmission,
             "modelYears": model_years_for_dropdown,
             "brandSeriesData": brand_series_structure,
         }

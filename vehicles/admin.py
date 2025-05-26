@@ -36,7 +36,7 @@ class CarAdvertisementAdmin(admin.ModelAdmin):
     )
     list_filter = (
         'is_active', 'advertise_status', 'vehicle_type', 'advertisement_type', 'price_type',
-        'brand', 'model_year', 'gear_type', 'fuel_type', 'steering_type', 'published_date'
+        'brand', 'model_year', 'transmission', 'fuel_type', 'steering_type', 'published_date'
     )
     search_fields = (
         'title', 'id', 'user__email', 'brand', 'series', 'address', 'explanation__explanation'
@@ -50,7 +50,7 @@ class CarAdvertisementAdmin(admin.ModelAdmin):
         ('Status & Type', {'fields': ('is_active', 'advertise_status', 'advertisement_type', 'vehicle_type')}),
         ('Pricing', {'fields': ('price', 'price_type')}),
         ('Vehicle Specs', {'fields': (
-            'brand', 'series', 'model_year', 'color', 'gear_type',
+            'brand', 'series', 'model_year', 'color', 'transmission',
             'fuel_type', 'steering_type', 'engine_displacement', 'engine_power'
         )}),
         ('Timestamps', {'fields': ('published_date', 'created_at', 'updated_at')}),

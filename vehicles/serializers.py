@@ -6,14 +6,14 @@ from .models import (
 )
 
 class CarImageSerializer(serializers.ModelSerializer):
-    image_url = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = CarImage
-        fields = ('id', 'image', 'image_url', 'is_cover', 'uploaded_at')
-        read_only_fields = ('id', 'image_url', 'uploaded_at')
+        fields = ('id', 'image',  'is_cover', 'uploaded_at')
+        read_only_fields = ('id', 'uploaded_at')
 
-    def get_image_url(self, obj):
+    def get_image(self, obj):
         request = self.context.get('request')
         if obj.image and request:
             return request.build_absolute_uri(obj.image.url)
@@ -55,7 +55,7 @@ class CarBasicSerializer(serializers.ModelSerializer):
         if cover_image_instance:
             request = self.context.get('request')
             image_serializer_data = CarImageSerializer(cover_image_instance, context={'request': request}).data
-            return image_serializer_data.get('image_url')
+            return image_serializer_data.get('image')
         return None
 
 class CarListSerializer(serializers.ModelSerializer):
@@ -66,7 +66,7 @@ class CarListSerializer(serializers.ModelSerializer):
         model = CarAdvertisement
         fields = (
             'id', 'title', 'price', 'price_type',
-            'address', 'brand', 'series', 'model_year', 'fuel_type', 'gear_type',
+             'brand', 'series', 'model_year', 'fuel_type', 'transmission', 'city', 'area',
             'images', 'published_date', 'is_active',
         )
 
@@ -103,8 +103,8 @@ class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CarAdvertisement
         fields = [
-            'title', 'price', 'price_type', 'address',
-            'brand', 'model_year', 'color', 'gear_type', 'series',
+            'title', 'price', 'price_type',
+            'brand', 'model_year', 'color', 'transmission', 'series', 'city', 'area',
             'fuel_type', 'steering_type', 'engine_displacement', 'engine_power',
              'advertise_status', 'explanation', 'external_features', 'internal_features', 'is_active'
         ]

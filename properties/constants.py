@@ -1,7 +1,3 @@
-import os
-from django.conf import settings
-
-LOCATION_JSON_FILE_PATH = os.path.join(settings.BASE_DIR,  'location.json')
 
 PREDEFINED_CAR_DATA = {
     "BMW": {
@@ -60,6 +56,18 @@ PROPERTY_TYPE_TR_LABELS_MAP = {
         'abandoned_building': 'Terkedilmiş Bina',
         'half_construction': 'Yarım İnşaat'
 }
+WARMING_TYPE_TR_LABELS_MAP = {
+    'natural_gas': 'Doğalgaz',
+    'central_heating': 'Merkezi Isıtma',
+    'underfloor_heating': 'Yerden Isıtma',
+    'stove': 'Soba (Odun/Kömür)',
+    'electric_heater': 'Elektrikli Isıtıcı',
+    'geothermal': 'Jeotermal Isıtma',
+    'solar': 'Güneş Enerjisi ile Isıtma',
+    'air_conditioner': 'Klima',
+    'no_heating': 'Isıtma Yok'
+}
+
 VEHICLE_TYPE_TR_LABELS_MAP = {
     'sedan': 'Sedan',
     'suv': 'SUV',
@@ -67,4 +75,11 @@ VEHICLE_TYPE_TR_LABELS_MAP = {
     'pickup': 'Pikap',
     'cabrio': 'Kabriyo',
     'minivan': 'Minivan',
+}
+TRANSMISSION_TR_LABELS_MAP = {
+    'automatic': 'Otomatik', 'manual': 'Manuel', 'semi-automatic': 'Yarı Otomatik',
+}
+
+FUEL_TYPE_TR_LABELS_MAP = {
+    'diesel': 'Dizel', 'gasoline': 'Benzin', 'lpg': 'LPG', 'hybrid': 'Hibrit', 'electric': 'Elektrikli',
 }

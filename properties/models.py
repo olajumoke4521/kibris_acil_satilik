@@ -109,7 +109,15 @@ class PropertyAdvertisement(models.Model):
     gross_area = models.DecimalField(max_digits=20, decimal_places=2, blank=True, null=True)
     net_area = models.DecimalField(max_digits=20, decimal_places=2, blank=True, null=True)
     building_age = models.IntegerField(blank=True, null=True)
-    floor_location = models.IntegerField(blank=True, null=True)
+    FLOOR_TYPE_CHOICES = [
+        ('basement', 'Basement'),
+        ('ground_floor', 'Ground Floor'),
+        ('1', '1st Floor'),
+        ('2', '2nd Floor'),
+        ('3', '3rd Floor'),
+        ('4+', '4th Floor or Higher'),
+    ]
+    floor_location = models.CharField(max_length=50, choices=FLOOR_TYPE_CHOICES, blank=True, null=True)
     housing_shape = models.CharField(max_length=20, blank=True, null=True)
 
     WARMING_TYPE_CHOICES = [

@@ -1,3 +1,7 @@
+import base64
+import uuid
+
+from django.core.files.base import ContentFile
 from django.db import models
 from django.db import transaction
 from rest_framework import viewsets, permissions, status, generics, filters
@@ -7,7 +11,6 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from knox.auth import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
-
 from properties.constants import PREDEFINED_CAR_DATA
 from .filters import CarFilter
 from .models import (
@@ -17,8 +20,8 @@ from .serializers import (
     CarAdminListSerializer, CarDetailSerializer, CarAdminCreateUpdateSerializer,
     CarListSerializer, CarImageSerializer, CarBasicSerializer
 )
+from properties.utils import base64_to_image_file
 from .utils import get_model_form_schema
-
 
 class CarAdminViewSet(viewsets.ModelViewSet):
     """ViewSet for Admin users to manage Car Advertisements."""
@@ -26,7 +29,7 @@ class CarAdminViewSet(viewsets.ModelViewSet):
     ).prefetch_related('images').all()
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    parser_classes = [FormParser, JSONParser]
     filterset_class = CarFilter
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'brand', 'series', 'explanation__explanation']
@@ -46,23 +49,58 @@ class CarAdminViewSet(viewsets.ModelViewSet):
         queryset = CarAdvertisement.objects.filter(is_active=True).select_related('user', 'explanation', 'external_features', 'internal_features').prefetch_related('images')
         return queryset
 
+
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        mutable_request_data = request.data.copy()
+        images_payload_list = mutable_request_data.pop('images', None)
 
+        if images_payload_list is not None and not isinstance(images_payload_list, list):
+            return Response(
+                {"detail": "The 'images_payload' field must be a list of image objects."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(data=mutable_request_data)
+        serializer.is_valid(raise_exception=True)
         instance = serializer.save(user=self.request.user)
 
-        images_data = request.FILES.getlist('images')
-        if images_data:
-            make_first_cover = not CarImage.objects.filter(car_ad=instance, is_cover=True).exists()
-            for i, image_file in enumerate(images_data):
-                CarImage.objects.create(
-                    car_ad=instance,
-                    image=image_file,
-                    is_cover=(i == 0 and make_first_cover)
-                )
+        has_explicit_cover_in_payload = any(
+            img_data.get('is_cover') for img_data in images_payload_list if isinstance(img_data, dict))
+        cover_image_assigned_in_loop = False
 
+        if images_payload_list:
+            for i, image_data_item in enumerate(images_payload_list):
+                if not isinstance(image_data_item, dict):
+                    continue
+
+                base64_str = image_data_item.get('image')
+                is_explicitly_cover = image_data_item.get('is_cover', False)
+                image_content_file = base64_to_image_file(base64_str, name_prefix=f"car_{instance.id}_img_")
+
+                if image_content_file:
+                    current_image_is_cover = False
+                    if has_explicit_cover_in_payload:
+                        if is_explicitly_cover and not cover_image_assigned_in_loop:
+                            current_image_is_cover = True
+                            cover_image_assigned_in_loop = True
+                    elif not cover_image_assigned_in_loop and i == 0:
+                        current_image_is_cover = True
+                        cover_image_assigned_in_loop = True
+
+                    CarImage.objects.create(
+                        car_ad=instance,
+                        image=image_content_file,
+                        is_cover=current_image_is_cover
+                    )
+
+        if not CarImage.objects.filter(car_ad=instance, is_cover=True).exists():
+            first_available_image = CarImage.objects.filter(car_ad=instance).order_by('uploaded_at').first()
+            if first_available_image:
+                first_available_image.is_cover = True
+                first_available_image.save(update_fields=['is_cover'])
+
+        instance.refresh_from_db()
         detail_serializer = CarDetailSerializer(instance, context=self.get_serializer_context())
         headers = self.get_success_headers(detail_serializer.data)
         return Response(detail_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -80,17 +118,51 @@ class CarAdminViewSet(viewsets.ModelViewSet):
         detail_serializer = CarDetailSerializer(updated_instance, context=self.get_serializer_context())
         return Response(detail_serializer.data)
 
-    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='upload-images')
+    @action(detail=True, methods=['post'], parser_classes=[JSONParser], url_path='upload-images')
     def upload_images(self, request, pk=None):
         car_ad = self.get_object()
-        images_data = request.FILES.getlist('images')
-        if not images_data: return Response({"detail": "No images provided."}, status=status.HTTP_400_BAD_REQUEST)
-        make_first_cover = not CarImage.objects.filter(car_ad=car_ad, is_cover=True).exists()
+        images_payload_list = request.data.get('images')
+        if not images_payload_list or not isinstance(images_payload_list, list):
+            return Response(
+                {"detail": "'images_payload' field is missing, empty, or not a list of image objects."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         created_images = []
-        for i, image_file in enumerate(images_data):
-            is_cover_candidate = (i == 0 and make_first_cover and not car_ad.images.exists())
-            img = CarImage.objects.create(car_ad=car_ad, image=image_file, is_cover=is_cover_candidate)
+        ad_already_has_cover = CarImage.objects.filter(car_ad=car_ad, is_cover=True).exists()
+        cover_assigned_in_this_batch = False
+
+        for i, image_data_item in enumerate(images_payload_list):
+            if not isinstance(image_data_item, dict):
+                continue
+            base64_str = image_data_item.get('image_base64')
+            is_explicitly_cover_from_payload = image_data_item.get('is_cover', False)
+
+            image_content_file = base64_to_image_file(base64_str, name_prefix=f"car_{car_ad.id}_upload_")
+
+            if image_content_file:
+                current_image_is_cover = False
+                if not ad_already_has_cover and not cover_assigned_in_this_batch:
+                    if is_explicitly_cover_from_payload:
+                        current_image_is_cover = True
+                        cover_assigned_in_this_batch = True
+                        if current_image_is_cover:
+                            CarImage.objects.filter(car_ad=car_ad, is_cover=True).update(is_cover=False)
+                    elif i == 0:
+                        current_image_is_cover = True
+                        cover_assigned_in_this_batch = True
+                elif ad_already_has_cover and is_explicitly_cover_from_payload and not cover_assigned_in_this_batch:
+                    CarImage.objects.filter(car_ad=car_ad, is_cover=True).update(is_cover=False)
+                    current_image_is_cover = True
+                    cover_assigned_in_this_batch = True
+
+            img = CarImage.objects.create(
+                        car_ad=car_ad,
+                        image=image_content_file,
+                        is_cover=current_image_is_cover
+                    )
             created_images.append(img)
+            if current_image_is_cover:
+                ad_already_has_cover = True
         serializer = CarImageSerializer(created_images, many=True, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

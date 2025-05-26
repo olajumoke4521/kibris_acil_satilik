@@ -50,7 +50,9 @@ class CarAdvertisement(models.Model):
         ('rent', 'Kiralık'),
     ]
     advertisement_type = models.CharField(max_length=50, choices=ADVERTISEMENT_TYPE_CHOICES)
-    address = models.TextField()
+    address = models.TextField(blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    area = models.CharField(max_length=100, blank=True, null=True)
 
     ADVERT_STATUS_CHOICES = [
         ('on', 'On'), ('off', 'Off'),
@@ -62,27 +64,17 @@ class CarAdvertisement(models.Model):
     advertise_status = models.CharField(max_length=10, choices=ADVERT_STATUS_CHOICES, default='on')
     published_date = models.DateTimeField(auto_now_add=True)
 
-    GEAR_TYPE_CHOICES = [
+    TRANSMISSION_CHOICES = [
         ('automatic', 'Automatic'), ('manual', 'Manual'), ('semi-automatic', 'Semi-Automatic'),
     ]
-    GEAR_TYPE_CHOICES_TR = [
+    TRANSMISSION_CHOICES_TR = [
         ('automatic', 'Otomatik'), ('manual', 'Manuel'), ('semi-automatic', 'Yarı Otomatik'),
     ]
-    gear_type = models.CharField(max_length=15, choices=GEAR_TYPE_CHOICES)
-    color = models.CharField(max_length=50)
+    transmission = models.CharField(max_length=15, choices=TRANSMISSION_CHOICES)
+    color = models.CharField(max_length=50, blank=True, null=True)
 
-    brand = models.CharField(
-        max_length=100,
-        choices=BRAND_CHOICES,
-        blank=True,
-        null=True
-    )
-    series = models.CharField(
-        max_length=100,
-        choices=SERIES_CHOICES,
-        blank=True,
-        null=True
-    )
+    brand = models.CharField(max_length=100, choices=BRAND_CHOICES, blank=True, null=True)
+    series = models.CharField(max_length=100, choices=SERIES_CHOICES, blank=True, null=True)
     model_year = models.IntegerField()
     FUEL_TYPE_CHOICES = [
         ('diesel', 'Diesel'), ('gasoline', 'Gasoline'), ('lpg', 'LPG'),
