@@ -110,11 +110,65 @@ class CarAdminViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
 
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        mutable_request_data = request.data.copy()
+        images_payload_list = mutable_request_data.pop('images', None) 
+
+        if images_payload_list is not None:
+             if not isinstance(images_payload_list, list):
+                return Response(
+                    {"detail": "If 'images_payload' is provided for update, it must be a list of image objects."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        serializer = self.get_serializer(instance, data=mutable_request_data, partial=partial)
         serializer.is_valid(raise_exception=True)
-
+        
         updated_instance = serializer.save()
+        if images_payload_list is not None: 
+            existing_images = CarImage.objects.filter(car_ad=updated_instance)
+            for img in existing_images:
+                img.delete()
+            
+            created_image_count = 0
+            has_explicit_cover_in_payload = any(img_data.get('is_cover') for img_data in images_payload_list if isinstance(img_data, dict))
+            cover_image_assigned_in_loop = False
 
+            if images_payload_list: 
+                for i, image_data_item in enumerate(images_payload_list):
+                    if not isinstance(image_data_item, dict):
+                        continue
+
+                    base64_str = image_data_item.get('image')
+                    is_explicitly_cover = image_data_item.get('is_cover', False)
+                    
+                    if not base64_str:
+                        continue
+
+                    image_content_file = base64_to_image_file(base64_str, name_prefix=f"car_{updated_instance.id}_img_")
+                    
+                    if image_content_file:
+                        current_image_is_cover = False
+                        if has_explicit_cover_in_payload:
+                            if is_explicitly_cover and not cover_image_assigned_in_loop:
+                                current_image_is_cover = True
+                                cover_image_assigned_in_loop = True
+                        elif not cover_image_assigned_in_loop and i == 0: 
+                            current_image_is_cover = True
+                            cover_image_assigned_in_loop = True
+                        
+                        CarImage.objects.create(
+                            car_ad=updated_instance,
+                            image=image_content_file,
+                            is_cover=current_image_is_cover
+                        )
+                        created_image_count += 1
+                        
+                if not CarImage.objects.filter(car_ad=updated_instance, is_cover=True).exists():
+                    first_available_image = CarImage.objects.filter(car_ad=updated_instance).order_by('uploaded_at').first()
+                    if first_available_image:
+                        first_available_image.is_cover = True
+                        first_available_image.save(update_fields=['is_cover'])
+
+        updated_instance.refresh_from_db()
         detail_serializer = CarDetailSerializer(updated_instance, context=self.get_serializer_context())
         return Response(detail_serializer.data)
 
@@ -134,7 +188,7 @@ class CarAdminViewSet(viewsets.ModelViewSet):
         for i, image_data_item in enumerate(images_payload_list):
             if not isinstance(image_data_item, dict):
                 continue
-            base64_str = image_data_item.get('image_base64')
+            base64_str = image_data_item.get('image')
             is_explicitly_cover_from_payload = image_data_item.get('is_cover', False)
 
             image_content_file = base64_to_image_file(base64_str, name_prefix=f"car_{car_ad.id}_upload_")
