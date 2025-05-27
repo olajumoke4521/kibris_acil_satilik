@@ -85,7 +85,7 @@ class PropertyAdminListSerializer(PropertyListSerializer):
 class PropertyDetailSerializer(serializers.ModelSerializer):
     """Serializer for DETAILED view (Public and Admin)"""
     images = PropertyImageSerializer(many=True, read_only=True)
-    explanation = PropertyExplanationSerializer(read_only=True)
+    explanation = serializers.CharField(source='explanation.explanation', read_only=True, allow_null=True)
     external_features = PropertyExternalFeatureSerializer(read_only=True, allow_null=True)
     interior_features = PropertyInteriorFeatureSerializer(read_only=True, allow_null=True)
     location = LocationSerializer(read_only=True)
@@ -113,7 +113,6 @@ class PropertyAdminCreateUpdateSerializer(serializers.ModelSerializer):
 
         external_features_data = validated_data.pop('external_features', None)
         interior_features_data = validated_data.pop('interior_features', None)
-        print(interior_features_data)
         explanation_data = validated_data.pop('explanation', None)
 
         validated_data.pop('city', None)

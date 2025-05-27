@@ -104,7 +104,7 @@ class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
         model = CarAdvertisement
         fields = [
             'title', 'price', 'price_type',
-            'brand', 'model_year', 'color', 'transmission', 'series', 'city', 'area',
+            'brand', 'model_year', 'color', 'transmission', 'series', 'city', 'area', 'vehicle_type', 'advertisement_type',
             'fuel_type', 'steering_type', 'engine_displacement', 'engine_power',
              'advertise_status', 'explanation', 'external_features', 'internal_features', 'is_active'
         ]
