@@ -474,7 +474,7 @@ class CombinedFilterOptionsView(APIView):
 
 
 class PropertyAdvertisementFormSchemaView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         main_model = PropertyAdvertisement

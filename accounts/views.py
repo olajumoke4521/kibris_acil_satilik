@@ -157,7 +157,7 @@ class OfferAdminViewSet(viewsets.ModelViewSet):
 class OfferResponseAdminViewSet(viewsets.ModelViewSet):
     queryset = OfferResponse.objects.select_related('offer', 'created_by', 'offered_by').filter(is_active=True).all()
     serializer_class = OfferResponseSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save(created_by_user=self.request.user)
