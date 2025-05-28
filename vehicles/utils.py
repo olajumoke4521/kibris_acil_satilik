@@ -199,33 +199,3 @@ def get_model_form_schema(model_class, is_child_schema=False, field_instance_on_
         return schema_dict
     else:
         return schema_dict
-
-
-from properties.constants import PREDEFINED_CAR_DATA
-
-BRAND_SLUG_TO_DISPLAY_LOOKUP = {
-    brand.lower().replace(" ", "-"): brand
-    for brand in PREDEFINED_CAR_DATA.keys()
-}
-
-SERIES_SLUG_TO_DISPLAY_LOOKUP = {}
-for brand_details in PREDEFINED_CAR_DATA.values():
-    for series_name_item in brand_details.get("series", []):
-        actual_series_name = ""
-        if isinstance(series_name_item, str):
-            actual_series_name = series_name_item
-        elif isinstance(series_name_item, dict) and 'name' in series_name_item:
-            actual_series_name = series_name_item['name']
-
-        if actual_series_name:
-            series_slug = actual_series_name.lower().replace(" ", "-")
-            if series_slug not in SERIES_SLUG_TO_DISPLAY_LOOKUP:
-                SERIES_SLUG_TO_DISPLAY_LOOKUP[series_slug] = actual_series_name
-
-
-def get_brand_display_name(brand_slug_value):
-    return BRAND_SLUG_TO_DISPLAY_LOOKUP.get(brand_slug_value, brand_slug_value)
-
-
-def get_series_display_name(series_slug_value):
-    return SERIES_SLUG_TO_DISPLAY_LOOKUP.get(series_slug_value, series_slug_value)

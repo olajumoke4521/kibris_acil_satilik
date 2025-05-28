@@ -1,7 +1,4 @@
-import base64
-import uuid
 
-from django.core.files.base import ContentFile
 from django.db import models
 from django.db import transaction
 from rest_framework import viewsets, permissions, status, generics, filters

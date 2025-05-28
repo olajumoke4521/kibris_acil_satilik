@@ -1,12 +1,8 @@
-
 from rest_framework import serializers
-
-from properties.data_loaders import get_location_english_labels
 from .models import (
     CarAdvertisement, CarImage, CarExplanation,
     CarExternalFeature, CarInternalFeature
 )
-from .utils import get_brand_display_name, get_series_display_name
 
 
 class CarImageSerializer(serializers.ModelSerializer):
@@ -91,41 +87,11 @@ class CarDetailSerializer(serializers.ModelSerializer):
     explanation = serializers.CharField(source='explanation.explanation', read_only=True, allow_null=True)
     external_features = CarExternalFeatureSerializer(read_only=True, allow_null=True)
     internal_features = CarInternalFeatureSerializer(read_only=True, allow_null=True)
-    vehicle_type = serializers.CharField(source='get_vehicle_type_display', read_only=True)
-    advertisement_type = serializers.CharField(source='get_advertisement_type_display', read_only=True)
-    advertise_status = serializers.CharField(source='get_advertise_status_display', read_only=True)
-    transmission = serializers.CharField(source='get_transmission_display', read_only=True)
-    fuel_type = serializers.CharField(source='get_fuel_type_display', read_only=True,
-                                              allow_null=True)
-    steering_type = serializers.CharField(source='get_steering_type_display', read_only=True)
-    brand = serializers.SerializerMethodField()
-    series = serializers.SerializerMethodField()
-    city = serializers.SerializerMethodField()
-    area = serializers.SerializerMethodField()
+
 
     class Meta:
         model = CarAdvertisement
         fields = '__all__'
-
-    def get_brand(self, obj):
-        return get_brand_display_name(obj.brand) if obj.brand else None
-
-    def get_series(self, obj):
-        return get_series_display_name(obj.series) if obj.series else None
-
-    def get_city(self, obj):
-        if obj.city:
-            area_val = obj.area or ''
-            labels = get_location_english_labels(obj.city, area_val)
-            return labels.get('city_label_en', obj.city)
-        return None
-
-    def get_area(self, obj):
-        if obj.city and obj.area:
-            labels = get_location_english_labels(obj.city, obj.area)
-            return labels.get('area_label', obj.area)
-        return obj.area
-
 
 class CarAdminCreateUpdateSerializer(serializers.ModelSerializer):
     """Serializer used by Admin for Creating and Updating Cars"""
