@@ -7,7 +7,11 @@ from django.utils.translation import gettext_lazy as _
 
 # --- Helper function to generate choices ---
 def generate_brand_choices(car_data):
-    return sorted([(brand.lower().replace(" ", "-"), brand) for brand in car_data.keys()])
+    choices = []
+    for display_name in PREDEFINED_CAR_DATA.keys():
+        internal_value = display_name.lower().replace('-', '').replace(' ', '')
+        choices.append((internal_value, display_name))
+    return sorted(choices, key=lambda x: x[1])
 
 def generate_series_choices(car_data):
     all_series = set()
