@@ -10,6 +10,9 @@ from django.conf import settings
 import base64
 import uuid
 
+from properties.constants import FEATURE_TR_LABELS_MAP
+
+
 def base64_to_image_file(base64_string, name_prefix="img_"):
     """
     Converts a base64 string (possibly a data URI) to a Django ContentFile.
@@ -49,6 +52,48 @@ def base64_to_image_file(base64_string, name_prefix="img_"):
         return ContentFile(decoded_file, name=file_name)
     except Exception:
         return None
+
+
+def get_bilingual_feature_metadata(model_class):
+    features = {}
+    for field in model_class._meta.get_fields():
+        if isinstance(field, models.BooleanField):
+            english_label = field.verbose_name.string if hasattr(field.verbose_name, 'string') else str(
+                field.verbose_name)
+
+            turkish_label = FEATURE_TR_LABELS_MAP.get(english_label, english_label)
+
+            features[field.name] = {
+                'label_en': english_label,
+                'label_tr': turkish_label
+            }
+    return features
+
+
+def get_choices_as_list_of_dicts(choices_tuple):
+    """Helper function to convert Django choices tuple to a list of dicts."""
+    return [{"value": choice[0], "label": choice[1]} for choice in choices_tuple]
+
+
+def get_bilingual_choices_as_list_of_dicts(choices_tuple, tr_label_map=None, en_label_map=None):
+    bilingual_list = []
+    for value, default_label in choices_tuple:
+        if tr_label_map and isinstance(tr_label_map, dict) and value in tr_label_map:
+            label_tr = tr_label_map[value]
+        else:
+            label_tr = default_label
+
+        if en_label_map and isinstance(en_label_map, dict) and value in en_label_map:
+            label_en = en_label_map[value]
+        else:
+            label_en = default_label
+
+        bilingual_list.append({
+            "value": value,
+            "label_tr": label_tr,
+            "label_en": label_en
+        })
+    return bilingual_list
 
 def get_frontend_field_type(field):
     if field.choices:

@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from .data_loaders import get_location_english_labels
 from .models import (
     PropertyAdvertisement, PropertyImage, PropertyExplanation, Location,
     PropertyExternalFeature, PropertyInteriorFeature
@@ -8,9 +10,17 @@ from vehicles.serializers import CarListSerializer
 
 
 class LocationSerializer(serializers.ModelSerializer):
+    city = serializers.SerializerMethodField()
+
     class Meta:
         model = Location
-        fields = ('id', 'city', 'area')
+        fields = ['id', 'city', 'area']
+
+    def get_city(self, obj):
+        if obj.city:
+            labels = get_location_english_labels(obj.city, obj.area)
+            return labels.get('city_label_en', obj.city)
+        return None
 
 class PropertyImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
@@ -89,6 +99,11 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
     external_features = PropertyExternalFeatureSerializer(read_only=True, allow_null=True)
     interior_features = PropertyInteriorFeatureSerializer(read_only=True, allow_null=True)
     location = LocationSerializer(read_only=True)
+    advertise_status = serializers.CharField(source='get_advertise_status_display', read_only=True)
+    floor_location = serializers.CharField(source='get_floor_location_display', read_only=True, allow_null=True)
+    property_type = serializers.CharField(source='get_property_type_display', read_only=True, allow_null=True)
+    advertisement_type = serializers.CharField(source='get_advertisement_type_display', read_only=True)
+    warming_type = serializers.CharField(source='get_warming_type_display', read_only=True, allow_null=True)
 
     class Meta:
         model = PropertyAdvertisement

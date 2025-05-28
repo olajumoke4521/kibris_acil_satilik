@@ -2,6 +2,7 @@ from django.db import models
 from django.core.validators import FileExtensionValidator
 from accounts.models import User
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 
 class Location(models.Model):
     id = models.AutoField(primary_key=True)
@@ -15,8 +16,7 @@ class Location(models.Model):
         verbose_name_plural = "Locations"
 
     def __str__(self):
-        parts = [self.city, self.area]
-        return ' / '.join(part for part in parts if part)
+        return f"{self.city} / {self.area}"
 
 class PropertyAdvertisement(models.Model):
     id = models.AutoField(primary_key=True)
@@ -191,26 +191,27 @@ class PropertyExplanation(models.Model):
 class PropertyExternalFeature(models.Model):
     id = models.AutoField(primary_key=True)
     property_ad = models.OneToOneField(PropertyAdvertisement, on_delete=models.CASCADE, related_name='external_features')
-    elevator = models.BooleanField(default=False)
-    gardened = models.BooleanField(default=False)
-    fitness = models.BooleanField(default=False)
-    security = models.BooleanField(default=False)
-    thermal_insulation = models.BooleanField(default=False)
-    doorman = models.BooleanField(default=False)
-    car_park = models.BooleanField(default=False)
-    playground = models.BooleanField(default=False)
-    water_tank = models.BooleanField(default=False)
-    tennis_court = models.BooleanField(default=False)
-    swimming_pool = models.BooleanField(default=False)
-    football_field = models.BooleanField(default=False)
-    basketball_field = models.BooleanField(default=False)
-    generator = models.BooleanField(default=False)
-    pvc = models.BooleanField(default=False)
-    market = models.BooleanField(default=False)
-    siding = models.BooleanField(default=False)
-    fire_escape = models.BooleanField(default=False)
+    elevator = models.BooleanField(default=False, verbose_name=_("Elevator"))
+    gardened = models.BooleanField(default=False, verbose_name=_("Gardened"))
+    fitness = models.BooleanField(default=False, verbose_name=_("Fitness Center"))
+    security = models.BooleanField(default=False, verbose_name=_("Security"))
+    thermal_insulation = models.BooleanField(default=False, verbose_name=_("Thermal Insulation"))
+    doorman = models.BooleanField(default=False, verbose_name=_("Doorman"))
+    car_park = models.BooleanField(default=False, verbose_name=_("Car Park"))
+    playground = models.BooleanField(default=False, verbose_name=_("Playground"))
+    water_tank = models.BooleanField(default=False, verbose_name=_("Water Tank"))
+    tennis_court = models.BooleanField(default=False, verbose_name=_("Tennis Court"))
+    swimming_pool = models.BooleanField(default=False, verbose_name=_("Swimming Pool"))
+    football_field = models.BooleanField(default=False, verbose_name=_("Football Field"))
+    basketball_field = models.BooleanField(default=False, verbose_name=_("Basketball Field"))
+    generator = models.BooleanField(default=False, verbose_name=_("Generator"))
+    pvc = models.BooleanField(default=False, verbose_name=_("PVC"))
+    market = models.BooleanField(default=False, verbose_name=_("Market Nearby"))
+    siding = models.BooleanField(default=False, verbose_name=_("Siding"))
+    fire_escape = models.BooleanField(default=False, verbose_name=_("Fire Escape"))
 
-    def __str__(self):
+
+def __str__(self):
         return f"External Features for {self.property_ad.title}"
 
 
@@ -219,36 +220,37 @@ class PropertyInteriorFeature(models.Model):
     property_ad = models.OneToOneField(PropertyAdvertisement, on_delete=models.CASCADE,
                                        related_name='interior_features')
 
-    adsl = models.BooleanField(default=False)
-    alarm = models.BooleanField(default=False)
-    balcony = models.BooleanField(default=False)
-    built_in_kitchen = models.BooleanField(default=False)
-    barbecue = models.BooleanField(default=False)
-    furnished = models.BooleanField(default=False)
-    laundry_room = models.BooleanField(default=False)
-    air_conditioning = models.BooleanField(default=False)
-    wallpaper = models.BooleanField(default=False)
-    dressing_room = models.BooleanField(default=False)
-    jacuzzi = models.BooleanField(default=False)
-    tv_satellite = models.BooleanField(default=False)
-    laminate = models.BooleanField(default=False)
-    marble_floor = models.BooleanField(default=False)
-    panel_door = models.BooleanField(default=False)
-    blinds = models.BooleanField(default=False)
-    shower = models.BooleanField(default=False)
-    sauna = models.BooleanField(default=False)
-    satin_plaster = models.BooleanField(default=False)
-    satin_color = models.BooleanField(default=False)
-    ceramic_floor = models.BooleanField(default=False)
-    video_intercom = models.BooleanField(default=False)
-    parquet = models.BooleanField(default=False)
-    spotlight = models.BooleanField(default=False)
-    fireplace = models.BooleanField(default=False)
-    terrace = models.BooleanField(default=False)
-    cloakroom = models.BooleanField(default=False)
-    underfloor_heating = models.BooleanField(default=False)
-    double_glazing = models.BooleanField(default=False)
-    parent_bathroom = models.BooleanField(default=False)
+    adsl = models.BooleanField(default=False, verbose_name=_("ADSL"))
+    alarm = models.BooleanField(default=False, verbose_name=_("Alarm System"))
+    balcony = models.BooleanField(default=False, verbose_name=_("Balcony"))
+    built_in_kitchen = models.BooleanField(default=False, verbose_name=_("Built-in Kitchen"))
+    barbecue = models.BooleanField(default=False, verbose_name=_("Barbecue"))
+    furnished = models.BooleanField(default=False, verbose_name=_("Furnished"))
+    laundry_room = models.BooleanField(default=False, verbose_name=_("Laundry Room"))
+    air_conditioning = models.BooleanField(default=False, verbose_name=_("Air Conditioning"))
+    wallpaper = models.BooleanField(default=False, verbose_name=_("Wallpaper"))
+    dressing_room = models.BooleanField(default=False, verbose_name=_("Dressing Room"))
+    jacuzzi = models.BooleanField(default=False, verbose_name=_("Jacuzzi"))
+    tv_satellite = models.BooleanField(default=False, verbose_name=_("TV Satellite"))
+    laminate = models.BooleanField(default=False, verbose_name=_("Laminate Flooring"))
+    marble_floor = models.BooleanField(default=False, verbose_name=_("Marble Floor"))
+    panel_door = models.BooleanField(default=False, verbose_name=_("Panel Door"))
+    blinds = models.BooleanField(default=False, verbose_name=_("Blinds"))
+    shower = models.BooleanField(default=False, verbose_name=_("Shower Cabin"))
+    sauna = models.BooleanField(default=False, verbose_name=_("Sauna"))
+    satin_plaster = models.BooleanField(default=False, verbose_name=_("Satin Plaster"))
+    satin_color = models.BooleanField(default=False, verbose_name=_("Satin Paint"))
+    ceramic_floor = models.BooleanField(default=False, verbose_name=_("Ceramic Floor"))
+    video_intercom = models.BooleanField(default=False, verbose_name=_("Video Intercom"))
+    parquet = models.BooleanField(default=False, verbose_name=_("Parquet"))
+    spotlight = models.BooleanField(default=False, verbose_name=_("Spotlight"))
+    fireplace = models.BooleanField(default=False, verbose_name=_("Fireplace"))
+    terrace = models.BooleanField(default=False, verbose_name=_("Terrace"))
+    cloakroom = models.BooleanField(default=False, verbose_name=_("Cloakroom"))
+    underfloor_heating = models.BooleanField(default=False, verbose_name=_(
+        "Underfloor Heating"))
+    double_glazing = models.BooleanField(default=False, verbose_name=_("Double Glazing"))
+    parent_bathroom = models.BooleanField(default=False, verbose_name=_("Parent Bathroom"))
 
     def __str__(self):
         return f"Interior Features for {self.property_ad.title}"

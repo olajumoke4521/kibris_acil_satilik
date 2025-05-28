@@ -14,11 +14,16 @@ from .serializers import (
     PropertyListSerializer, PropertyImageSerializer, LatestAdvertisementSerializer, PropertyBasicSerializer
 )
 from .filters import PropertyFilter
-from vehicles.models import CarAdvertisement
+from vehicles.models import CarAdvertisement, CarExternalFeature, CarInternalFeature
 from .constants import PREDEFINED_CAR_DATA, PROPERTY_TYPE_TR_LABELS_MAP, VEHICLE_TYPE_TR_LABELS_MAP, \
     FUEL_TYPE_TR_LABELS_MAP, TRANSMISSION_TR_LABELS_MAP, WARMING_TYPE_TR_LABELS_MAP
 from .utils import get_dynamic_model_form_schema, base64_to_image_file
 from .data_loaders import CITY_AREAS_DATA
+from .utils import (
+    get_bilingual_feature_metadata,
+    get_bilingual_choices_as_list_of_dicts,
+    get_choices_as_list_of_dicts
+)
 
 
 class PropertyAdminViewSet(viewsets.ModelViewSet):
@@ -378,32 +383,6 @@ class LatestAdvertisementsView(APIView):
 
         return Response(serializer.data)
 
-
-def get_choices_as_list_of_dicts(choices_tuple):
-    """Helper function to convert Django choices tuple to a list of dicts."""
-    return [{"value": choice[0], "label": choice[1]} for choice in choices_tuple]
-
-
-def get_bilingual_choices_as_list_of_dicts(choices_tuple, tr_label_map=None, en_label_map=None):
-    bilingual_list = []
-    for value, default_label in choices_tuple:
-        if tr_label_map and isinstance(tr_label_map, dict) and value in tr_label_map:
-            label_tr = tr_label_map[value]
-        else:
-            label_tr = default_label
-
-        if en_label_map and isinstance(en_label_map, dict) and value in en_label_map:
-            label_en = en_label_map[value]
-        else:
-            label_en = default_label
-
-        bilingual_list.append({
-            "value": value,
-            "label_tr": label_tr,
-            "label_en": label_en
-        })
-    return bilingual_list
-
 class CombinedFilterOptionsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -418,6 +397,8 @@ class CombinedFilterOptionsView(APIView):
         )
         room_types = get_choices_as_list_of_dicts(PropertyAdvertisement.ROOM_TYPE_CHOICES)
         floor_types = get_choices_as_list_of_dicts(PropertyAdvertisement.FLOOR_TYPE_CHOICES)
+        property_external_features = get_bilingual_feature_metadata(PropertyExternalFeature)
+        property_internal_features = get_bilingual_feature_metadata(PropertyInteriorFeature)
 
         return {
             "propertyTypes": property_types,
@@ -425,6 +406,8 @@ class CombinedFilterOptionsView(APIView):
             "warmingTypes": warming_types,
             "floorTypes": floor_types,
             "cityAreas": CITY_AREAS_DATA,
+            "externalFeatures": property_external_features,
+            "internalFeatures": property_internal_features,
         }
 
     def get_car_options(self):
@@ -468,6 +451,8 @@ class CombinedFilterOptionsView(APIView):
                 "value": year_str,
                 "label": year_str
             })
+        car_external_features = get_bilingual_feature_metadata(CarExternalFeature)
+        car_internal_features = get_bilingual_feature_metadata(CarInternalFeature)
 
         return {
             "vehicleTypes": vehicle_types,
@@ -475,6 +460,8 @@ class CombinedFilterOptionsView(APIView):
             "transmissionTypes": transmission,
             "modelYears": model_years_for_dropdown,
             "brandSeriesData": brand_series_structure,
+            "externalFeatures": car_external_features,
+            "internalFeatures": car_internal_features,
         }
 
     def get(self, request, *args, **kwargs):

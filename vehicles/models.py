@@ -3,6 +3,7 @@ from django.conf import settings
 from django.core.validators import FileExtensionValidator
 from accounts.models import User
 from properties.constants import PREDEFINED_CAR_DATA
+from django.utils.translation import gettext_lazy as _
 
 # --- Helper function to generate choices ---
 def generate_brand_choices(car_data):
@@ -141,24 +142,24 @@ class CarInternalFeature(models.Model):
     id = models.AutoField(primary_key=True)
     car_ad = models.OneToOneField(CarAdvertisement, on_delete=models.CASCADE, related_name='internal_features')
 
-    fabric_armchair = models.BooleanField(default=False)
-    leather_fabric_armchair = models.BooleanField(default=False)
-    electric_windshields = models.BooleanField(default=False)
-    front_armrest = models.BooleanField(default=False)
-    rear_armrest = models.BooleanField(default=False)
-    keyless_drive = models.BooleanField(default=False)
-    forward_gear = models.BooleanField(default=False)
-    hydraulic_steering = models.BooleanField(default=False)
-    functional_steering_wheel = models.BooleanField(default=False)
-    adjustable_steering_wheel = models.BooleanField(default=False)
-    leather_steering_wheel = models.BooleanField(default=False)
-    cruise_control = models.BooleanField(default=False)
-    adaptive_cruise_control = models.BooleanField(default=False)
-    reverse_view_camera = models.BooleanField(default=False)
-    road_computer = models.BooleanField(default=False)
-    start_stop = models.BooleanField(default=False)
-    air_conditioner_digital = models.BooleanField(default=False)
-    digital_monitor = models.BooleanField(default=False)
+    fabric_armchair = models.BooleanField(default=False, verbose_name=_("Fabric Armchair"))
+    leather_fabric_armchair = models.BooleanField(default=False, verbose_name=_("Leather-Fabric Armchair"))
+    electric_windshields = models.BooleanField(default=False, verbose_name=_("Electric Windshields"))
+    front_armrest = models.BooleanField(default=False, verbose_name=_("Front Armrest"))
+    rear_armrest = models.BooleanField(default=False, verbose_name=_("Rear Armrest"))
+    keyless_drive = models.BooleanField(default=False, verbose_name=_("Keyless Drive"))
+    forward_gear = models.BooleanField(default=False, verbose_name=_("Forward Gear"))
+    hydraulic_steering = models.BooleanField(default=False, verbose_name=_("Hydraulic Steering"))
+    functional_steering_wheel = models.BooleanField(default=False, verbose_name=_("Functional Steering Wheel"))
+    adjustable_steering_wheel = models.BooleanField(default=False, verbose_name=_("Adjustable Steering Wheel"))
+    leather_steering_wheel = models.BooleanField(default=False, verbose_name=_("Leather Steering Wheel"))
+    cruise_control = models.BooleanField(default=False, verbose_name=_("Cruise Control"))
+    adaptive_cruise_control = models.BooleanField(default=False, verbose_name=_("Adaptive Cruise Control"))
+    reverse_view_camera = models.BooleanField(default=False, verbose_name=_("Reverse View Camera"))
+    road_computer = models.BooleanField(default=False, verbose_name=_("Road Computer"))
+    start_stop = models.BooleanField(default=False, verbose_name=_("Start-Stop System"))
+    air_conditioner_digital = models.BooleanField(default=False, verbose_name=_("Digital Air Conditioner"))
+    digital_monitor = models.BooleanField(default=False, verbose_name=_("Digital Monitor"))
 
     def __str__(self):
         return f"Internal Features for {self.car_ad.title}"
@@ -168,18 +169,18 @@ class CarExternalFeature(models.Model):
     id = models.AutoField(primary_key=True)
     car_ad = models.OneToOneField(CarAdvertisement, on_delete=models.CASCADE, related_name='external_features')
 
-    headlamp_xenon = models.BooleanField(default=False)
-    headlight_adaptive = models.BooleanField(default=False)
-    headlight_sensor = models.BooleanField(default=False)
-    electric_mirrors = models.BooleanField(default=False)
-    folding_mirrors = models.BooleanField(default=False)
-    mirrors_heated = models.BooleanField(default=False)
-    parking_sensor_rear = models.BooleanField(default=False)
-    parking_sensor_front = models.BooleanField(default=False)
-    rain_sensor = models.BooleanField(default=False)
-    alloy_wheel = models.BooleanField(default=False)
-    rear_window_defroster = models.BooleanField(default=False)
-    smart_tailgate = models.BooleanField(default=False)
+    headlamp_xenon = models.BooleanField(default=False, verbose_name=_("Xenon Headlamps"))
+    headlight_adaptive = models.BooleanField(default=False, verbose_name=_("Adaptive Headlights"))
+    headlight_sensor = models.BooleanField(default=False, verbose_name=_("Headlight Sensor"))
+    electric_mirrors = models.BooleanField(default=False, verbose_name=_("Electric Mirrors"))
+    folding_mirrors = models.BooleanField(default=False, verbose_name=_("Folding Mirrors"))
+    mirrors_heated = models.BooleanField(default=False, verbose_name=_("Heated Mirrors"))
+    parking_sensor_rear = models.BooleanField(default=False, verbose_name=_("Rear Parking Sensor"))
+    parking_sensor_front = models.BooleanField(default=False, verbose_name=_("Front Parking Sensor"))
+    rain_sensor = models.BooleanField(default=False, verbose_name=_("Rain Sensor"))
+    alloy_wheel = models.BooleanField(default=False, verbose_name=_("Alloy Wheels"))
+    rear_window_defroster = models.BooleanField(default=False, verbose_name=_("Rear Window Defroster"))
+    smart_tailgate = models.BooleanField(default=False, verbose_name=_("Smart Tailgate"))
 
     def __str__(self):
         return f"External Features for {self.car_ad.title}"
